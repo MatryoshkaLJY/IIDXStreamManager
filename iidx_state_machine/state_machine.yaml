@@ -4,8 +4,8 @@ states:
     is_initial: true
 
   - id: ENTRY
-    description: “Player has entered the game, showing entry animation"
-  
+    description: "Player has entered the game, showing entry animation"
+      
   - id: MODESEL
     description: "Game entered mode selection"
 
@@ -59,7 +59,7 @@ states:
 
   - id: B_INTER
     description: "Player is in interlude between battle rounds"
-  
+
   - id: S_SONGSEL
     description: "Player is selecting song for standard game"
 
@@ -81,8 +81,11 @@ states:
   - id: D_PLAY
     description: "Player is playing Dan course"
 
-  - id: D_SCORE
-    description: "Player is viewing score for Dan course"
+  - id: D_SCORE_S
+    description: "Player is viewing score after completing a song in Dan course"
+
+  - id: D_SCORE_D
+    description: "Player is viewing score after failing a song in Dan course"
 
   - id: D_DEATH
     description: "Player has failed a song in Dan course"
@@ -99,207 +102,485 @@ states:
   
 
 
+# ==================== 事件定义 ====================
+events:
+  - idle          # Attract mode/standby screen
+  - splash        # Boot splash screen
+  - blank         # Black/blank screen
+  - entry         # Player login/logout screen
+  - pay           # Payment/credit screen
+  - interlude     # Interlude/transition screen
+  - modesel       # Mode selection screen
+  - dansel        # Dan course selection screen
+  - songsel       # Song selection screen
+  - confirm       # Song confirmation screen
+  - play1         # 1P gameplay screen
+  - play2         # 2P gameplay screen
+  - play12        # Versus gameplay screen (1P vs 2P)
+  - playd         # Double play (DP) mode gameplay screen
+  - bwait         # Battle mode waiting screen
+  - bsel          # Battle mode selection screen
+  - brank         # Battle mode ranking screen
+  - death         # Stage failed screen
+  - score         # Stage result/score screen
+  - danscore      # Dan course result screen
+  - lab           # Event mode screen
+  - others        # Other/miscellaneous screens
+  - await         # Arena mode waiting screen
+  - aconfirm      # Arena mode confirmation screen
+  - arank         # Arena mode ranking screen
+  - asum          # Arena mode summary screen
+  - set           # Settings screen
+
 # ==================== 状态转换定义 ====================
 transitions:
-  # 格式：当前状态 -> 目标状态，触发事件，守卫条件，执行动作
-
-  # 启动流程
-  - from: SYSTEM_BOOT
-    to: ATTRACT_MODE
-    event: boot_complete
-    guards: []
-    actions:
-      - action: play_startup_sound
-
-  # 投币/刷卡流程
-  - from: ATTRACT_MODE
-    to: CREDIT_CHECK
-    event: coin_inserted
-    guards: []
-    actions:
-      - action: add_credit
-        params: { amount: 1 }
-
-  - from: ATTRACT_MODE
-    to: CREDIT_CHECK
-    event: card_swiped
-    guards: []
-    actions:
-      - action: read_card_data
-
-  - from: CREDIT_CHECK
-    to: ATTRACT_MODE
-    event: timeout
-    guards:
-      - condition: credits == 0
-        description: "无信用点时返回待机"
-    actions: []
-
-  - from: CREDIT_CHECK
-    to: MODE_SELECT
-    event: start_pressed
-    guards:
-      - condition: credits >= 1 OR card_inserted == true
-        description: "有足够的信用点或已插卡"
-    actions:
-      - action: consume_credit
-        condition: card_inserted == false
-
-  # 模式选择流程
-  - from: MODE_SELECT
-    to: MUSIC_SELECT
-    event: mode_selected
+  # IDLE -> ENTRY: 玩家登录
+  - from: IDLE
+    to: ENTRY
+    event: entry
     guards: []
     actions: []
 
-  - from: MODE_SELECT
-    to: ATTRACT_MODE
-    event: back_pressed
-    guards:
-      - condition: elapsed_time > 30s
-        description: "超时返回待机"
-    actions:
-      - action: refund_credit
-
-  # 选曲流程
-  - from: MUSIC_SELECT
-    to: OPTIONS_SELECT
-    event: song_confirmed
+  # ENTRY -> MODESEL: 选择游戏模式
+  - from: ENTRY
+    to: MODESEL
+    event: modesel
     guards: []
     actions: []
 
-  - from: MUSIC_SELECT
-    to: MODE_SELECT
-    event: back_pressed
+  # LOGOUT -> IDLE: 返回待机
+  - from: LOGOUT
+    to: IDLE
+    event: blank
     guards: []
     actions: []
 
-  - from: MUSIC_SELECT
-    to: ATTRACT_MODE
-    event: timeout
-    guards:
-      - condition: elapsed_time > 60s
-    actions:
-      - action: refund_credit
-
-  # 选项设置流程
-  - from: OPTIONS_SELECT
-    to: STAGE_PREPARE
-    event: options_confirmed
+  # ==================== Arena模式状态转移 ====================
+  # MODESEL -> A_WAIT: 进入竞技场等待
+  - from: MODESEL
+    to: A_WAIT
+    event: await
     guards: []
     actions: []
 
-  - from: OPTIONS_SELECT
-    to: MUSIC_SELECT
-    event: back_pressed
+  # A_WAIT -> A_SONGSEL: 选择歌曲
+  - from: A_WAIT
+    to: A_SONGSEL
+    event: songsel
     guards: []
     actions: []
 
-  # 游戏流程
-  - from: STAGE_PREPARE
-    to: GAMEPLAY
-    event: load_complete
+  # A_SONGSEL -> A_CONFIRM: 确认歌曲
+  - from: A_SONGSEL
+    to: A_CONFIRM
+    event: aconfirm
     guards: []
-    actions:
-      - action: hide_loading_screen
+    actions: []
 
-  - from: STAGE_PREPARE
-    to: SYSTEM_ERROR
-    event: load_failed
+  # A_CONFIRM -> A_PLAY: 开始游戏（任意play模式）
+  - from: A_CONFIRM
+    to: A_PLAY
+    event: [play1, play2, play12, playd]
     guards: []
-    actions:
-      - action: set_error_code
-        params: { code: 1001, message: "Chart load failed" }
+    actions: []
+
+  # A_PLAY -> A_SCORE: 游戏结束显示分数
+  - from: A_PLAY
+    to: A_SCORE
+    event: score
+    guards: []
+    actions: []
+
+  # A_SCORE -> A_INTER: 进入间幕
+  - from: A_SCORE
+    to: A_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # A_INTER -> A_RANK: 显示排名
+  - from: A_INTER
+    to: A_RANK
+    event: arank
+    guards: []
+    actions: []
+
+  # A_RANK -> A_SUM: 显示总结
+  - from: A_RANK
+    to: A_SUM
+    event: asum
+    guards: []
+    actions: []
+
+  # A_SUM -> LOGOUT: 退出登录
+  - from: A_SUM
+    to: LOGOUT
+    event: entry
+    guards: []
+    actions: []
+
+  # A_PLAY -> A_INTER: 游戏到间幕的循环路径
+  - from: A_PLAY
+    to: A_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # A_INTER -> A_CONFIRM: 间幕返回确认的循环路径
+  - from: A_INTER
+    to: A_CONFIRM
+    event: aconfirm
+    guards: []
+    actions: []
+
+  # ==================== Battle模式状态转移 ====================
+  # MODESEL -> B_WAIT: 进入对战等待
+  - from: MODESEL
+    to: B_WAIT
+    event: bwait
+    guards: []
+    actions: []
+
+  # B_WAIT -> B_MODESEL: 选择对战模式
+  - from: B_WAIT
+    to: B_MODESEL
+    event: bsel
+    guards: []
+    actions: []
+
+  # B_MODESEL -> B_SONGSEL: 选择歌曲
+  - from: B_MODESEL
+    to: B_SONGSEL
+    event: songsel
+    guards: []
+    actions: []
+
+  # B_SONGSEL -> B_CONFIRM: 确认歌曲
+  - from: B_SONGSEL
+    to: B_CONFIRM
+    event: aconfirm
+    guards: []
+    actions: []
+
+  # B_CONFIRM -> B_PLAY: 开始游戏（任意play模式）
+  - from: B_CONFIRM
+    to: B_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # B_PLAY -> B_SCORE: 游戏结束显示分数
+  - from: B_PLAY
+    to: B_SCORE
+    event: score
+    guards: []
+    actions: []
+
+  # B_SCORE -> B_INTER: 进入间幕
+  - from: B_SCORE
+    to: B_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # B_INTER -> B_RANK: 显示排名
+  - from: B_INTER
+    to: B_RANK
+    event: brank
+    guards: []
+    actions: []
+
+  # B_RANK -> LOGOUT: 退出登录
+  - from: B_RANK
+    to: LOGOUT
+    event: entry
+    guards: []
+    actions: []
+
+  # B_PLAY -> B_INTER: 游戏到间幕的循环路径
+  - from: B_PLAY
+    to: B_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # B_INTER -> B_CONFIRM: 间幕返回确认的循环路径
+  - from: B_INTER
+    to: B_CONFIRM
+    event: aconfirm
+    guards: []
+    actions: []
+
+  # ==================== Standard模式状态转移 ====================
+  # MODESEL -> S_SONGSEL: 选择标准模式歌曲
+  - from: MODESEL
+    to: S_SONGSEL
+    event: songsel
+    guards: []
+    actions: []
+
+  # S_SONGSEL -> S_PLAY: 开始标准模式游戏
+  - from: S_SONGSEL
+    to: S_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # S_PLAY -> S_INTER: 进入间幕
+  - from: S_PLAY
+    to: S_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # S_INTER -> LOGOUT: 退出登录
+  - from: S_INTER
+    to: LOGOUT
+    event: entry
+    guards: []
+    actions: []
+
+  # S_PLAY -> S_SCORE: 显示分数
+  - from: S_PLAY
+    to: S_SCORE
+    event: score
+    guards: []
+    actions: []
+
+  # S_SCORE -> S_INTER: 分数到间幕
+  - from: S_SCORE
+    to: S_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # S_INTER -> S_PLAY: 间幕返回游戏
+  - from: S_INTER
+    to: S_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # S_PLAY -> S_DEATH: 歌曲失败
+  - from: S_PLAY
+    to: S_DEATH
+    event: death
+    guards: []
+    actions: []
+
+  # S_DEATH -> S_PLAY: 失败后继续游戏
+  - from: S_DEATH
+    to: S_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # S_DEATH -> S_SCORE: 失败后显示分数
+  - from: S_DEATH
+    to: S_SCORE
+    event: score
+    guards: []
+    actions: []
+
+  # S_DEATH -> S_INTER: 失败后进入间幕
+  - from: S_DEATH
+    to: S_INTER
+    event: interlude
+    guards: []
+    actions: []
+
+  # ==================== Dan模式状态转移 ====================
+  # MODESEL -> D_SEL: 选择段位模式
+  - from: MODESEL
+    to: D_SEL
+    event: dansel
+    guards: []
+    actions: []
+
+  # D_SEL -> D_PLAY: 开始段位游戏
+  - from: D_SEL
+    to: D_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # D_PLAY -> D_INTER_S: 完成歌曲后进入间幕
+  - from: D_PLAY
+    to: D_INTER_S
+    event: interlude
+    guards: []
+    actions: []
+
+  # D_INTER_S -> D_RANK: 显示段位排名
+  - from: D_INTER_S
+    to: D_RANK
+    event: danscore
+    guards: []
+    actions: []
+
+  # D_INTER_S -> D_PLAY: 间幕后继续下一首
+  - from: D_INTER_S
+    to: D_PLAY
+    event: [play1, play2, play12, playd]
+    guards: []
+    actions: []
+
+  # D_RANK -> LOGOUT: 退出登录
+  - from: D_RANK
+    to: LOGOUT
+    event: entry
+    guards: []
+    actions: []
+
+  # D_PLAY -> D_SCORE_S: 完成歌曲显示分数
+  - from: D_PLAY
+    to: D_SCORE_S
+    event: score
+    guards: []
+    actions: []
+
+  # D_SCORE_S -> D_INTER_S: 分数到间幕
+  - from: D_SCORE_S
+    to: D_INTER_S
+    event: interlude
+    guards: []
+    actions: []
+
+  # D_PLAY -> D_DEATH: 歌曲失败
+  - from: D_PLAY
+    to: D_DEATH
+    event: death
+    guards: []
+    actions: []
+
+  # D_DEATH -> D_INTER_D: 失败后进入间幕
+  - from: D_DEATH
+    to: D_INTER_D
+    event: interlude
+    guards: []
+    actions: []
+
+  # D_DEATH -> D_SCORE_D: 失败显示分数
+  - from: D_DEATH
+    to: D_SCORE_D
+    event: score
+    guards: []
+    actions: []
+
+  # D_SCORE_D -> D_INTER_D: 失败分数到间幕
+  - from: D_SCORE_D
+    to: D_INTER_D
+    event: interlude
+    guards: []
+    actions: []
+
+  # D_INTER_D -> D_RANK: 失败后间幕到排名
+  - from: D_INTER_D
+    to: D_RANK
+    event: danscore
+    guards: []
+    actions: []
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   - from: GAMEPLAY
     to: STAGE_RESULT
     event: song_finished
     guards: []
     actions:
-      - action: finalize_score
-
-  - from: GAMEPLAY
-    to: STAGE_RESULT
-    event: quit_pressed
-    guards:
-      - condition: is_at_break_point == true
-        description: "只能在段落间隙退出"
-    actions:
-      - action: mark_as_failed
-
-  - from: GAMEPLAY
-    to: SYSTEM_ERROR
-    event: hardware_error
-    guards: []
-    actions:
-      - action: emergency_stop
-
-  # 结果流程
-  - from: STAGE_RESULT
-    to: MUSIC_SELECT
-    event: continue_pressed
-    guards:
-      - condition: current_stage < max_stages
-        description: "还有剩余舞台"
-    actions:
-      - action: increment_stage
-
-  - from: STAGE_RESULT
-    to: COURSE_RESULT
-    event: continue_pressed
-    guards:
-      - condition: current_stage >= max_stages
-        description: "已完成所有舞台"
-    actions: []
-
-  - from: STAGE_RESULT
-    to: NAME_ENTRY
-    event: new_record
-    guards:
-      - condition: score > highscore_threshold
-        description: "分数进入高分榜"
-    actions: []
-
-  - from: STAGE_RESULT
-    to: ATTRACT_MODE
-    event: timeout
-    guards:
-      - condition: elapsed_time > 30s
-    actions: []
-
-  # 整组结果流程
-  - from: COURSE_RESULT
-    to: NAME_ENTRY
-    event: new_record
-    guards:
-      - condition: total_score > course_highscore
-    actions: []
-
-  - from: COURSE_RESULT
-    to: ATTRACT_MODE
-    event: any_key_pressed
-    guards: []
-    actions: []
-
-  - from: COURSE_RESULT
-    to: ATTRACT_MODE
-    event: timeout
-    guards:
-      - condition: elapsed_time > 45s
-    actions: []
-
-  # 名字输入流程
-  - from: NAME_ENTRY
-    to: ATTRACT_MODE
-    event: name_saved
-    guards: []
-    actions: []
-
-  # 错误恢复
-  - from: SYSTEM_ERROR
-    to: SYSTEM_BOOT
-    event: reset_pressed
-    guards:
-      - condition: is_recoverable == true
-    actions:
-      - action: clear_error
