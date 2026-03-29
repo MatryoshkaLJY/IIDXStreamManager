@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browse &amp; Infer</title>
+<style>
+:root {
+  --bg:        #1e1e1e;
+  --bg-item:   #2d2d2d;
+  --fg:        #e0e0e0;
+  --fg-dim:    #888;
+  --border:    #383838;
+  --conf-high: #28a745;
+  --conf-mid:  #e8a000;
+  --conf-low:  #dc3545;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; }
+
+/* ── Top bar ── */
+#topbar {
+  background: #111; border-bottom: 1px solid var(--border);
+  padding: 5px 10px; display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; min-height: 42px; flex-wrap: wrap;
+}
+#topbar h1 { font-size: 13px; font-weight: 700; white-space: nowrap; }
+#dir-input, #model-input {
+  background: #3a3a3a; color: var(--fg);
+  border: 1px solid #555; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px;
+}
+#dir-input   { flex: 1; min-width: 200px; }
+#model-input { width: 180px; }
+#infer-btn {
+  background: #7952b3; color: white; border: none;
+  padding: 5px 12px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+}
+#infer-btn:hover:not(:disabled) { background: #6840a0; }
+#infer-btn:disabled { background: #555; cursor: default; }
+#filter-select, #sort-select {
+  background: #3a3a3a; color: var(--fg);
+  border: 1px solid #555; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px; cursor: pointer;
+}
+#count-text { font-size: 11px; color: var(--fg-dim); font-family: monospace; white-space: nowrap; }
+a.switch-link {
+  font-size: 11px; color: #6ea8fe; text-decoration: none;
+  padding: 4px 8px; border: 1px solid #444; border-radius: 4px;
+  white-space: nowrap; flex-shrink: 0;
+}
+a.switch-link:hover { background: #2a2a3a; }
+
+/* ── Grid area ── */
+#grid-wrap {
+  flex: 1; overflow-y: auto; padding: 12px;
+}
+#grid-wrap::-webkit-scrollbar { width: 8px; }
+#grid-wrap::-webkit-scrollbar-track { background: #111; }
+#grid-wrap::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+#grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+}
+#placeholder {
+  text-align: center; color: #444; font-size: 15px;
+  line-height: 2; padding: 80px 20px;
+}
+
+/* ── Tile ── */
+.grid-tile {
+  background: var(--bg-item); border-radius: 6px; overflow: hidden;
+  cursor: pointer; border: 2px solid transparent;
+  transition: border-color 0.1s, transform 0.1s;
+  position: relative;
+}
+.grid-tile:hover { border-color: #555; transform: scale(1.02); }
+.grid-tile:hover .tile-scores { display: block; }
+.tile-img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; background: #333; }
+.tile-footer { padding: 4px 6px 5px; background: #222; }
+.tile-filename {
+  font-size: 9px; color: var(--fg-dim); font-family: monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px;
+}
+.tile-pred {
+  font-size: 11px; font-weight: 600;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tile-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tile-conf  { font-size: 10px; font-family: monospace; color: var(--fg-dim); flex-shrink: 0; margin-left: 4px; }
+.conf-high .tile-pred { color: #7ecf7e; }
+.conf-mid  .tile-pred { color: #ffd060; }
+.conf-low  .tile-pred { color: #f08080; }
+
+/* hover score tooltip */
+.tile-scores {
+  display: none; position: absolute; bottom: 0; left: 0; right: 0;
+  background: rgba(10,10,10,0.93); padding: 6px 8px;
+  font-size: 10px; font-family: monospace; line-height: 1.7; color: var(--fg-dim);
+  pointer-events: none;
+}
+
+/* ── Modal ── */
+#modal {
+  position: fixed; inset: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: center;
+}
+#modal[hidden] { display: none; }
+#modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.82); }
+#modal-box {
+  position: relative; z-index: 1; background: #1a1a1a;
+  border-radius: 8px; overflow: hidden;
+  max-width: 90vw; max-height: 90vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+#modal-img { max-width: 100%; max-height: 70vh; object-fit: contain; display: block; background: #111; }
+#modal-info {
+  padding: 10px 14px; background: #161616; border-top: 1px solid var(--border);
+  overflow-y: auto;
+}
+#modal-filename { font-size: 12px; color: var(--fg-dim); font-family: monospace; margin-bottom: 6px; }
+#modal-badge { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+#modal-badge.conf-high { color: #7ecf7e; }
+#modal-badge.conf-mid  { color: #ffd060; }
+#modal-badge.conf-low  { color: #f08080; }
+#modal-scores-list { display: flex; flex-wrap: wrap; gap: 5px; }
+.score-chip {
+  font-size: 10px; padding: 2px 7px; border-radius: 10px;
+  background: #2a2a2a; color: var(--fg-dim); font-family: monospace; border: 1px solid #444;
+}
+.score-chip.top1 { background: #1e3a22; color: #7ecf7e; border-color: #3a6040; }
+#modal-close {
+  position: absolute; top: 8px; right: 10px; z-index: 2;
+  background: rgba(0,0,0,0.5); color: #aaa; border: none;
+  font-size: 20px; cursor: pointer; border-radius: 50%;
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+}
+#modal-close:hover { background: rgba(255,255,255,0.15); color: #fff; }
+#modal-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  display: flex; justify-content: space-between; width: 100%; padding: 0 4px; pointer-events: none; z-index: 2;
+}
+.modal-arrow {
+  background: rgba(0,0,0,0.5); color: #ccc; border: none;
+  font-size: 22px; cursor: pointer; border-radius: 4px;
+  width: 36px; height: 48px; display: flex; align-items: center; justify-content: center;
+  pointer-events: all; transition: background 0.1s;
+}
+.modal-arrow:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+/* ── Status bar ── */
+#statusbar {
+  background: #111; border-top: 1px solid var(--border);
+  padding: 3px 10px; font-size: 11px; color: var(--fg-dim); font-family: monospace;
+  flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Browse &amp; Infer</h1>
+  <input id="dir-input"   type="text" placeholder="/path/to/directory" autocomplete="off">
+  <input id="model-input" type="text" placeholder="classifier.pth" value="classifier.pth" autocomplete="off">
+  <button id="infer-btn">▶ Run Inference</button>
+  <select id="filter-select"><option value="">All labels</option></select>
+  <select id="sort-select">
+    <option value="filename">Sort: Filename</option>
+    <option value="conf-asc">Sort: Least confident</option>
+    <option value="conf-desc">Sort: Most confident</option>
+    <option value="label">Sort: Label</option>
+  </select>
+  <span id="count-text">—</span>
+  <a class="switch-link" href="/">Annotate</a>
+  <a class="switch-link" href="/verify">Verify</a>
+</div>
+
+<div id="grid-wrap">
+  <div id="grid"></div>
+  <div id="placeholder">Enter a directory path above and click Run Inference</div>
+</div>
+
+<div id="modal" hidden>
+  <div id="modal-backdrop"></div>
+  <div id="modal-box">
+    <button id="modal-close">×</button>
+    <div id="modal-nav">
+      <button class="modal-arrow" id="modal-prev">‹</button>
+      <button class="modal-arrow" id="modal-next">›</button>
+    </div>
+    <img id="modal-img" alt="">
+    <div id="modal-info">
+      <div id="modal-filename"></div>
+      <div id="modal-badge"></div>
+      <div id="modal-scores-list"></div>
+    </div>
+  </div>
+</div>
+
+<div id="statusbar">Ready — enter a directory path and run inference</div>
+
+<script>
+'use strict';
+
+let allResults  = [];  // [{filename, path, predicted, confidence, scores}]
+let filtered    = [];  // subset after filter + sort
+let modalIdx    = -1;  // current modal position in filtered[]
+
+const dirInput     = document.getElementById('dir-input');
+const modelInput   = document.getElementById('model-input');
+const inferBtn     = document.getElementById('infer-btn');
+const filterSelect = document.getElementById('filter-select');
+const sortSelect   = document.getElementById('sort-select');
+const countText    = document.getElementById('count-text');
+const grid         = document.getElementById('grid');
+const placeholder  = document.getElementById('placeholder');
+const statusbar    = document.getElementById('statusbar');
+const modal        = document.getElementById('modal');
+const modalImg     = document.getElementById('modal-img');
+const modalFilename= document.getElementById('modal-filename');
+const modalBadge   = document.getElementById('modal-badge');
+const modalScores  = document.getElementById('modal-scores-list');
+
+// ── Inference ─────────────────────────────────────────────────────────────────
+inferBtn.addEventListener('click', async () => {
+  const dir   = dirInput.value.trim();
+  const model = modelInput.value.trim() || 'classifier.pth';
+  if (!dir) { setStatus('Please enter a directory path'); return; }
+
+  inferBtn.disabled = true;
+  inferBtn.textContent = '⏳ Running…';
+  setStatus(`Running inference on "${dir}" …`);
+  grid.innerHTML = '';
+  placeholder.style.display = 'block';
+  placeholder.textContent = '⏳ Running inference, please wait…';
+
+  try {
+    const res = await apiFetch('/api/browse/infer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dir, model }),
+    });
+    allResults = res.results;
+    buildFilterOptions();
+    applyFilterSort();
+    setStatus(`Done — ${allResults.length} images processed in "${dir}"`);
+  } catch (err) {
+    placeholder.textContent = `Error: ${err.message}`;
+    setStatus(`Error: ${err.message}`);
+  } finally {
+    inferBtn.disabled = false;
+    inferBtn.textContent = '▶ Run Inference';
+  }
+});
+
+// ── Filter / Sort ─────────────────────────────────────────────────────────────
+filterSelect.addEventListener('change', applyFilterSort);
+sortSelect.addEventListener('change', applyFilterSort);
+
+function buildFilterOptions() {
+  const counts = {};
+  allResults.forEach(r => { counts[r.predicted] = (counts[r.predicted] || 0) + 1; });
+  const labels = Object.keys(counts).sort();
+  filterSelect.innerHTML = `<option value="">All labels (${allResults.length})</option>`;
+  labels.forEach(lbl => {
+    const opt = document.createElement('option');
+    opt.value = lbl;
+    opt.textContent = `${lbl} (${counts[lbl]})`;
+    filterSelect.appendChild(opt);
+  });
+}
+
+function applyFilterSort() {
+  const labelFilter = filterSelect.value;
+  const sort = sortSelect.value;
+  filtered = labelFilter
+    ? allResults.filter(r => r.predicted === labelFilter)
+    : [...allResults];
+
+  if (sort === 'conf-asc')  filtered.sort((a, b) => a.confidence - b.confidence);
+  else if (sort === 'conf-desc') filtered.sort((a, b) => b.confidence - a.confidence);
+  else if (sort === 'label') filtered.sort((a, b) =>
+    a.predicted.localeCompare(b.predicted) || a.filename.localeCompare(b.filename));
+  else filtered.sort((a, b) => a.filename.localeCompare(b.filename));
+
+  renderGrid();
+  countText.textContent = `${filtered.length} / ${allResults.length}`;
+}
+
+// ── Grid rendering ─────────────────────────────────────────────────────────────
+let tileObserver = null;
+const gridWrap = document.getElementById('grid-wrap');
+
+function renderGrid() {
+  if (tileObserver) { tileObserver.disconnect(); tileObserver = null; }
+  grid.innerHTML = '';
+
+  if (!filtered.length) {
+    placeholder.style.display = 'block';
+    placeholder.textContent = allResults.length
+      ? 'No images match the current filter'
+      : 'No image files found in the directory';
+    return;
+  }
+  placeholder.style.display = 'none';
+
+  tileObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const img = e.target.querySelector('.tile-img');
+      if (img?.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
+      tileObserver.unobserve(e.target);
+    });
+  }, { root: gridWrap, rootMargin: '500px' });
+
+  const frag = document.createDocumentFragment();
+  filtered.forEach((item, fi) => {
+    const cc = confCls(item.confidence);
+    const tile = document.createElement('div');
+    tile.className = `grid-tile ${cc}`;
+    tile.dataset.fi = fi;
+    const imgUrl = `/browse_img?path=${encodeURIComponent(item.path)}`;
+    const top5 = Object.entries(item.scores)
+      .sort((a, b) => b[1] - a[1]).slice(0, 5)
+      .map(([l, p]) => `${escHtml(l)}: ${(p * 100).toFixed(1)}%`).join('<br>');
+    tile.innerHTML = `
+      <img class="tile-img" data-src="${escHtml(imgUrl)}" alt="">
+      <div class="tile-scores">${top5}</div>
+      <div class="tile-footer">
+        <div class="tile-filename">${escHtml(item.filename)}</div>
+        <div class="tile-pred">
+          <span class="tile-label">${escHtml(item.predicted)}</span>
+          <span class="tile-conf">${(item.confidence * 100).toFixed(0)}%</span>
+        </div>
+      </div>`;
+    tile.addEventListener('click', () => openModal(fi));
+    frag.appendChild(tile);
+    tileObserver.observe(tile);
+  });
+  grid.appendChild(frag);
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+function openModal(fi) {
+  modalIdx = fi;
+  const item = filtered[fi];
+  modalImg.src = `/browse_img?path=${encodeURIComponent(item.path)}`;
+  modalFilename.textContent = `${item.filename}  [${fi + 1} / ${filtered.length}]`;
+  const cc = confCls(item.confidence);
+  modalBadge.className = cc;
+  modalBadge.textContent = `${item.predicted}  ${(item.confidence * 100).toFixed(1)}%`;
+  const sorted = Object.entries(item.scores).sort((a, b) => b[1] - a[1]);
+  modalScores.innerHTML = sorted.map(([lbl, p], i) =>
+    `<span class="score-chip ${i === 0 ? 'top1' : ''}">${escHtml(lbl)} ${(p * 100).toFixed(1)}%</span>`
+  ).join('');
+  modal.removeAttribute('hidden');
+}
+
+function closeModal() {
+  modal.setAttribute('hidden', '');
+  modalImg.src = '';
+}
+
+function modalStep(delta) {
+  if (!filtered.length) return;
+  const next = (modalIdx + delta + filtered.length) % filtered.length;
+  openModal(next);
+}
+
+document.getElementById('modal-close').addEventListener('click', closeModal);
+document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+document.getElementById('modal-prev').addEventListener('click', () => modalStep(-1));
+document.getElementById('modal-next').addEventListener('click', () => modalStep(1));
+
+document.addEventListener('keydown', e => {
+  if (!modal.hasAttribute('hidden')) {
+    if (e.key === 'Escape')                      { closeModal(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); modalStep(1);  return; }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.preventDefault(); modalStep(-1); return; }
+  }
+  // Press Enter on dir input to run
+  if (e.key === 'Enter' && document.activeElement === dirInput) {
+    inferBtn.click();
+  }
+});
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function confCls(c) {
+  return c >= 0.9 ? 'conf-high' : c >= 0.7 ? 'conf-mid' : 'conf-low';
+}
+function setStatus(msg) { statusbar.textContent = msg; }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+async function apiFetch(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); msg = j.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+</script>
+</body>
+</html>

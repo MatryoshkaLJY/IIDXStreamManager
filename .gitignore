@@ -1,0 +1,15 @@
+# Data directory
+iidx_state_reco/data/
+iidx_score_reco/data/
+iidx_stream_state_machine/tmp
+# Claude files
+**/.claude/
+# **/CLAUDE.md
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so

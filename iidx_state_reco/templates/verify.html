@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Model Verification</title>
+<style>
+:root {
+  --bg:           #1e1e1e;
+  --bg-item:      #2d2d2d;
+  --bg-pending:   #3d2e00;
+  --bg-accepted:  #1e3020;
+  --bg-corrected: #1a2840;
+  --bg-sel:       #1a3a5c;
+  --bg-cur:       #0d6efd;
+  --fg:           #e0e0e0;
+  --fg-dim:       #888;
+  --accent:       #ffc857;
+  --border:       #383838;
+  --conf-high:    #28a745;
+  --conf-mid:     #e8a000;
+  --conf-low:     #dc3545;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--fg); font-family: 'Segoe UI', system-ui, sans-serif; display: flex; flex-direction: column; }
+
+/* ── Top bar ── */
+#topbar {
+  background: #111; border-bottom: 1px solid var(--border);
+  padding: 5px 10px; display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; min-height: 42px;
+}
+#topbar h1 { font-size: 13px; font-weight: 700; color: var(--fg); white-space: nowrap; }
+#session-select, #model-input {
+  background: #3a3a3a; color: var(--fg);
+  border: 1px solid #555; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px; cursor: pointer;
+}
+#model-input { width: 190px; cursor: text; }
+#infer-btn {
+  background: #7952b3; color: white; border: none;
+  padding: 5px 12px; border-radius: 4px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap; flex-shrink: 0;
+}
+#infer-btn:hover { background: #6840a0; }
+#infer-btn:disabled { background: #555; cursor: default; }
+#filter-select {
+  background: #3a3a3a; color: var(--fg);
+  border: 1px solid #555; border-radius: 4px;
+  padding: 4px 8px; font-size: 12px; cursor: pointer;
+}
+#progress-bar-wrap {
+  display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0;
+}
+#progress-bar-bg {
+  flex: 1; height: 6px; background: #444; border-radius: 3px; overflow: hidden; min-width: 60px;
+}
+#progress-bar-fill { height: 100%; background: var(--conf-high); transition: width 0.3s; width: 0; }
+#progress-text { font-size: 11px; color: var(--fg-dim); font-family: monospace; white-space: nowrap; }
+#save-status { font-size: 11px; color: var(--fg-dim); font-family: monospace; white-space: nowrap; }
+a.switch-link {
+  font-size: 11px; color: #6ea8fe; text-decoration: none;
+  padding: 4px 8px; border: 1px solid #444; border-radius: 4px;
+  white-space: nowrap; flex-shrink: 0;
+}
+a.switch-link:hover { background: #2a2a3a; }
+
+/* ── Main layout ── */
+#main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Filmstrip ── */
+#filmstrip {
+  width: 190px; flex-shrink: 0;
+  background: var(--bg); border-right: 1px solid var(--border);
+  overflow-y: auto; overflow-x: hidden;
+}
+#filmstrip::-webkit-scrollbar { width: 6px; }
+#filmstrip::-webkit-scrollbar-track { background: #111; }
+#filmstrip::-webkit-scrollbar-thumb { background: #444; border-radius: 3px; }
+.thumb-item {
+  display: flex; gap: 5px; padding: 3px 5px;
+  cursor: pointer; border-bottom: 1px solid #252525; align-items: center;
+  transition: background 0.1s;
+}
+.thumb-item:hover     { background: #383838 !important; }
+.thumb-item.is-cur    { background: var(--bg-cur) !important; }
+.thumb-item.is-pending   { background: var(--bg-pending); }
+.thumb-item.is-accepted  { background: var(--bg-accepted); }
+.thumb-item.is-corrected { background: var(--bg-corrected); }
+.thumb-img {
+  width: 72px; height: 46px; object-fit: cover;
+  background: #333; flex-shrink: 0; border-radius: 2px; display: block;
+}
+.thumb-info { flex: 1; min-width: 0; }
+.thumb-idx   { font-size: 9px; color: var(--fg-dim); font-family: monospace; }
+.thumb-name  { font-size: 9px; color: var(--fg); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.thumb-pred  { font-size: 9px; font-style: italic; min-height: 13px; }
+.thumb-pred.conf-high { color: #7ecf7e; }
+.thumb-pred.conf-mid  { color: var(--accent); }
+.thumb-pred.conf-low  { color: #f78080; }
+
+/* ── Center area ── */
+#center {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #111;
+}
+#preview-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative; min-height: 0;
+}
+#preview-img { max-width: 100%; max-height: 100%; object-fit: contain; display: none; }
+#preview-placeholder { color: #444; font-size: 15px; text-align: center; line-height: 2; }
+
+/* prediction panel */
+#pred-panel {
+  flex-shrink: 0; background: #161616; border-top: 1px solid var(--border);
+  padding: 8px 16px; display: none;
+}
+#pred-row { display: flex; align-items: center; gap: 12px; }
+#pred-badge {
+  font-size: 22px; font-weight: 700; padding: 4px 14px; border-radius: 6px;
+  background: #2a2a2a; color: var(--fg); letter-spacing: .03em;
+  flex-shrink: 0; min-width: 120px; text-align: center;
+}
+#pred-badge.conf-high { background: #1a3a22; color: #7ecf7e; }
+#pred-badge.conf-mid  { background: #3a2e00; color: #ffd060; }
+#pred-badge.conf-low  { background: #3a1a1a; color: #f08080; }
+#pred-conf-col { flex: 1; min-width: 0; }
+#pred-conf-label { font-size: 11px; color: var(--fg-dim); margin-bottom: 4px; font-family: monospace; }
+#pred-conf-bar-bg { height: 8px; background: #333; border-radius: 4px; overflow: hidden; }
+#pred-conf-bar-fill { height: 100%; border-radius: 4px; transition: width 0.2s; }
+#pred-top3 {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px;
+}
+.top3-chip {
+  font-size: 10px; padding: 2px 7px; border-radius: 10px;
+  background: #2a2a2a; color: var(--fg-dim); font-family: monospace;
+  border: 1px solid #444;
+}
+.top3-chip.top3-first { background: #2a3a2a; color: #9ed89e; border-color: #3a5a3a; }
+#pred-status-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 10px;
+  letter-spacing: .08em; text-transform: uppercase; flex-shrink: 0;
+}
+#pred-status-badge.st-pending   { background: #3d2e00; color: var(--accent); }
+#pred-status-badge.st-accepted  { background: #1e3020; color: #7ecf7e; }
+#pred-status-badge.st-corrected { background: #1a2840; color: #6ea8fe; }
+
+/* ── Right panel ── */
+#right-panel {
+  width: 200px; flex-shrink: 0;
+  background: var(--bg); border-left: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#accept-btn {
+  margin: 10px; background: var(--conf-high); color: white; border: none;
+  border-radius: 6px; padding: 9px; cursor: pointer; font-size: 13px; font-weight: 700;
+  display: block; width: calc(100% - 20px); text-align: center;
+}
+#accept-btn:hover { background: #218838; }
+#accept-btn:disabled { background: #444; cursor: default; }
+#right-panel h2 {
+  font-size: 11px; font-weight: 600; color: var(--fg-dim); text-transform: uppercase;
+  letter-spacing: .05em; padding: 6px 10px 4px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#tags-list {
+  flex: 1; overflow-y: auto; padding: 6px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+#tags-list::-webkit-scrollbar { width: 4px; }
+#tags-list::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
+.tag-btn {
+  width: 100%; background: var(--bg-item); color: var(--fg);
+  border: 1px solid transparent; border-radius: 4px;
+  padding: 5px 8px; text-align: left; cursor: pointer;
+  font-size: 12px; display: flex; align-items: center; gap: 6px;
+  transition: background 0.1s, border-color 0.1s;
+}
+.tag-btn:hover { background: #3a3a3a; border-color: #555; }
+.tag-btn.active { background: var(--bg-cur); border-color: var(--bg-cur); }
+.tag-key {
+  font-family: monospace; font-size: 10px; color: var(--accent);
+  background: #3a3a3a; border: 1px solid #555;
+  border-radius: 3px; padding: 0 4px; min-width: 18px; text-align: center;
+}
+.tag-btn.active .tag-key { background: rgba(255,255,255,0.2); border-color: transparent; }
+
+/* ── Status bar ── */
+#statusbar {
+  background: #111; border-top: 1px solid var(--border);
+  padding: 3px 10px; font-size: 11px; color: var(--fg-dim); font-family: monospace;
+  flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hint {
+  position: fixed; bottom: 28px; right: 210px;
+  font-size: 10px; color: #555; font-family: monospace; pointer-events: none;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <h1>Model Verification</h1>
+  <select id="session-select"><option value="">— select session —</option></select>
+  <input id="model-input" type="text" placeholder="classifier.pth" value="classifier.pth">
+  <button id="infer-btn">▶ Run Inference</button>
+  <select id="filter-select">
+    <option value="all">All</option>
+    <option value="pending" selected>Pending</option>
+    <option value="uncertain">Uncertain (&lt;80%)</option>
+    <option value="corrected">Corrected</option>
+  </select>
+  <div id="progress-bar-wrap">
+    <div id="progress-bar-bg"><div id="progress-bar-fill"></div></div>
+    <span id="progress-text">—</span>
+  </div>
+  <span id="save-status"></span>
+  <a class="switch-link" href="/">Annotate</a>
+  <a class="switch-link" href="/browse">Browse</a>
+</div>
+
+<div id="main">
+  <div id="filmstrip"></div>
+
+  <div id="center">
+    <div id="preview-wrap">
+      <img id="preview-img" alt="preview">
+      <div id="preview-placeholder">Select a session and run inference to begin</div>
+    </div>
+    <div id="pred-panel">
+      <div id="pred-row">
+        <div id="pred-badge">—</div>
+        <div id="pred-conf-col">
+          <div id="pred-conf-label">confidence: —</div>
+          <div id="pred-conf-bar-bg"><div id="pred-conf-bar-fill"></div></div>
+          <div id="pred-top3"></div>
+        </div>
+        <div id="pred-status-badge" class="st-pending">pending</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="right-panel">
+    <button id="accept-btn" disabled>Accept  [Space]</button>
+    <h2>Correct label</h2>
+    <div id="tags-list"></div>
+  </div>
+</div>
+
+<div id="statusbar">Ready — open a session</div>
+<div id="hint">← → navigate &nbsp;|&nbsp; Space accept &nbsp;|&nbsp; 1–9 / a–i correct</div>
+
+<script>
+'use strict';
+
+// ── State ────────────────────────────────────────────────────────────────────
+let session     = null;
+let allImages   = [];  // [{filename, label, predicted, confidence, scores}]
+let filtered    = [];  // indices into allImages matching current filter
+let curFiltered = 0;   // position in filtered[]
+let tags        = [];
+let dirty       = false;
+
+// ── DOM ──────────────────────────────────────────────────────────────────────
+const filmstrip     = document.getElementById('filmstrip');
+const previewImg    = document.getElementById('preview-img');
+const placeholder   = document.getElementById('preview-placeholder');
+const predPanel     = document.getElementById('pred-panel');
+const predBadge     = document.getElementById('pred-badge');
+const predConfLabel = document.getElementById('pred-conf-label');
+const predConfFill  = document.getElementById('pred-conf-bar-fill');
+const predTop3      = document.getElementById('pred-top3');
+const predStatus    = document.getElementById('pred-status-badge');
+const tagsList      = document.getElementById('tags-list');
+const progressFill  = document.getElementById('progress-bar-fill');
+const progressText  = document.getElementById('progress-text');
+const statusbar     = document.getElementById('statusbar');
+const saveStatus    = document.getElementById('save-status');
+const sessionSelect = document.getElementById('session-select');
+const filterSelect  = document.getElementById('filter-select');
+const inferBtn      = document.getElementById('infer-btn');
+const acceptBtn     = document.getElementById('accept-btn');
+const modelInput    = document.getElementById('model-input');
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const [sessions, tagsData] = await Promise.all([
+    apiFetch('/api/sessions'),
+    apiFetch('/api/tags'),
+  ]);
+  tags = tagsData;
+  buildTagButtons();
+  sessions.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s.name;
+    const pct = s.total ? Math.round(s.labeled / s.total * 100) : 0;
+    opt.textContent = `${s.name}  (${s.labeled}/${s.total})`;
+    sessionSelect.appendChild(opt);
+  });
+}
+
+function buildTagButtons() {
+  tagsList.innerHTML = '';
+  tags.forEach((tag, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tag-btn';
+    btn.dataset.tag = tag;
+    const keyStr = i < 9 ? String(i + 1) : i < 18 ? String.fromCharCode(97 + i - 9) : '';
+    btn.innerHTML = `<span class="tag-key">${keyStr || '·'}</span>${tag}`;
+    btn.addEventListener('click', () => applyCorrection(tag));
+    tagsList.appendChild(btn);
+  });
+}
+
+// ── Session loading ───────────────────────────────────────────────────────────
+sessionSelect.addEventListener('change', async () => {
+  const name = sessionSelect.value;
+  if (!name) return;
+  await loadSession(name);
+});
+
+async function loadSession(name) {
+  session = name;
+  setStatus('Loading…');
+  const [imgList, preds] = await Promise.all([
+    apiFetch(`/api/session/${encodeURIComponent(name)}/images`),
+    apiFetch(`/api/session/${encodeURIComponent(name)}/predictions`).catch(() => ({})),
+  ]);
+  allImages = imgList.map(img => ({
+    filename:   img.filename,
+    label:      img.label || '',
+    predicted:  preds[img.filename]?.predicted  || '',
+    confidence: preds[img.filename]?.confidence || 0,
+    scores:     preds[img.filename]?.scores     || {},
+  }));
+  dirty = false;
+  applyFilter();
+  updateProgress();
+  setStatus(`Loaded ${allImages.length} frames — ${name}`);
+}
+
+// ── Filtering ─────────────────────────────────────────────────────────────────
+filterSelect.addEventListener('change', applyFilter);
+
+function statusOf(img) {
+  if (!img.predicted) return 'none';
+  if (!img.label)     return 'pending';
+  if (img.label === img.predicted) return 'accepted';
+  return 'corrected';
+}
+
+function applyFilter() {
+  const f = filterSelect.value;
+  filtered = allImages.map((img, i) => i).filter(i => {
+    const img = allImages[i];
+    if (!img.predicted) return false;   // hide frames with no prediction
+    const s = statusOf(img);
+    if (f === 'all')       return true;
+    if (f === 'pending')   return s === 'pending';
+    if (f === 'uncertain') return s === 'pending' && img.confidence < 0.8;
+    if (f === 'corrected') return s === 'corrected';
+    return true;
+  });
+  curFiltered = 0;
+  buildFilmstrip();
+  if (filtered.length > 0) showFiltered(0);
+  else {
+    previewImg.style.display = 'none';
+    predPanel.style.display = 'none';
+    placeholder.style.display = 'block';
+    acceptBtn.disabled = true;
+    setStatus(`No frames match the current filter (${filterSelect.value})`);
+  }
+}
+
+// ── Filmstrip ─────────────────────────────────────────────────────────────────
+let thumbObserver = null;
+
+function buildFilmstrip() {
+  if (thumbObserver) { thumbObserver.disconnect(); thumbObserver = null; }
+  filmstrip.innerHTML = '';
+  if (!filtered.length) return;
+
+  thumbObserver = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      const img = e.target.querySelector('.thumb-img');
+      if (img?.dataset.src) { img.src = img.dataset.src; img.removeAttribute('data-src'); }
+      thumbObserver.unobserve(e.target);
+    });
+  }, { root: filmstrip, rootMargin: '300px' });
+
+  const frag = document.createDocumentFragment();
+  filtered.forEach((imgIdx, fi) => {
+    const img = allImages[imgIdx];
+    const st  = statusOf(img);
+    const confClass = confCls(img.confidence);
+    const stClass   = st === 'accepted'  ? 'is-accepted'
+                    : st === 'corrected' ? 'is-corrected'
+                    : st === 'pending'   ? 'is-pending' : '';
+    const item = document.createElement('div');
+    item.className = 'thumb-item ' + stClass;
+    item.dataset.fi = fi;
+    const imgSrc = `/img/${encodeURIComponent(session)}/${encodeURIComponent(img.filename)}`;
+    const predStr = img.predicted
+      ? `${img.predicted} ${(img.confidence * 100).toFixed(0)}%`
+      : '(no prediction)';
+    item.innerHTML = `
+      <img class="thumb-img" data-src="${imgSrc}" alt="" loading="lazy">
+      <div class="thumb-info">
+        <div class="thumb-idx">#${imgIdx + 1}</div>
+        <div class="thumb-name">${escHtml(img.filename)}</div>
+        <div class="thumb-pred ${confClass}">${escHtml(predStr)}</div>
+      </div>`;
+    item.addEventListener('click', () => showFiltered(fi));
+    frag.appendChild(item);
+    thumbObserver.observe(item);
+  });
+  filmstrip.appendChild(frag);
+  paintFilmstrip();
+}
+
+function paintFilmstrip() {
+  filmstrip.querySelectorAll('.thumb-item').forEach(item => {
+    const fi  = Number(item.dataset.fi);
+    const img = allImages[filtered[fi]];
+    const st  = statusOf(img);
+    item.classList.toggle('is-cur',       fi === curFiltered);
+    item.classList.toggle('is-pending',   fi !== curFiltered && st === 'pending');
+    item.classList.toggle('is-accepted',  fi !== curFiltered && st === 'accepted');
+    item.classList.toggle('is-corrected', fi !== curFiltered && st === 'corrected');
+  });
+}
+
+function scrollToCur() {
+  const item = filmstrip.querySelector(`[data-fi="${curFiltered}"]`);
+  if (item) item.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ── Preview ────────────────────────────────────────────────────────────────────
+function showFiltered(fi) {
+  if (fi < 0 || fi >= filtered.length) return;
+  curFiltered = fi;
+  const img = allImages[filtered[fi]];
+  previewImg.src = `/img/${encodeURIComponent(session)}/${encodeURIComponent(img.filename)}`;
+  previewImg.style.display = 'block';
+  placeholder.style.display = 'none';
+  predPanel.style.display = 'block';
+  acceptBtn.disabled = !img.predicted;
+  paintFilmstrip();
+  scrollToCur();
+  renderPrediction(img);
+  setStatus(`[${fi + 1}/${filtered.length}]  ${img.filename}  |  pred: ${img.predicted || '—'}  |  label: ${img.label || '(none)'}`);
+}
+
+function renderPrediction(img) {
+  if (!img.predicted) {
+    predBadge.textContent = '—';
+    predBadge.className = '';
+    predConfLabel.textContent = 'No prediction — run inference first';
+    predConfFill.style.width = '0';
+    predConfFill.style.background = '#555';
+    predTop3.innerHTML = '';
+    predStatus.textContent = '—';
+    predStatus.className = 'st-pending';
+    return;
+  }
+
+  const cc = confCls(img.confidence);
+  predBadge.textContent = img.predicted;
+  predBadge.className = cc;
+  predConfLabel.textContent = `confidence: ${(img.confidence * 100).toFixed(1)}%`;
+  const confColor = cc === 'conf-high' ? 'var(--conf-high)'
+                  : cc === 'conf-mid'  ? 'var(--conf-mid)'
+                  :                     'var(--conf-low)';
+  predConfFill.style.width   = (img.confidence * 100).toFixed(1) + '%';
+  predConfFill.style.background = confColor;
+
+  // Top-3 chips
+  const top3 = Object.entries(img.scores)
+    .sort((a, b) => b[1] - a[1]).slice(0, 3);
+  predTop3.innerHTML = top3.map(([ lbl, p ], idx) =>
+    `<span class="top3-chip ${idx === 0 ? 'top3-first' : ''}">${escHtml(lbl)} ${(p * 100).toFixed(1)}%</span>`
+  ).join('');
+
+  const st = statusOf(img);
+  if (st === 'accepted') {
+    predStatus.textContent = 'accepted';
+    predStatus.className = 'st-accepted';
+  } else if (st === 'corrected') {
+    predStatus.textContent = `corrected → ${img.label}`;
+    predStatus.className = 'st-corrected';
+  } else {
+    predStatus.textContent = 'pending';
+    predStatus.className = 'st-pending';
+  }
+
+  // Highlight active tag
+  tagsList.querySelectorAll('.tag-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tag === img.label);
+  });
+}
+
+// ── Accept / Correct ──────────────────────────────────────────────────────────
+function acceptPrediction() {
+  if (!session || !filtered.length) return;
+  const img = allImages[filtered[curFiltered]];
+  if (!img.predicted) return;
+  img.label = img.predicted;
+  afterLabel(img);
+}
+
+function applyCorrection(tag) {
+  if (!session || !filtered.length) return;
+  const img = allImages[filtered[curFiltered]];
+  img.label = tag;
+  afterLabel(img);
+}
+
+function afterLabel(img) {
+  dirty = true;
+  scheduleSave();
+  renderPrediction(img);
+  paintFilmstrip();
+  updateProgress();
+  const fi = curFiltered;
+  // Advance to next in filtered list
+  const next = fi + 1;
+  if (next < filtered.length) {
+    showFiltered(next);
+  } else {
+    // Stay on current, show done message
+    setStatus(`All ${filtered.length} filtered frames reviewed — ${labeledCountAll()}/${allImages.length} total labeled`);
+  }
+}
+
+// ── Inference ─────────────────────────────────────────────────────────────────
+inferBtn.addEventListener('click', async () => {
+  if (!session) { setStatus('Select a session first'); return; }
+  inferBtn.disabled = true;
+  inferBtn.textContent = '⏳ Running…';
+  setStatus('Running inference…');
+  try {
+    const res = await apiFetch(`/api/session/${encodeURIComponent(session)}/infer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: modelInput.value.trim() || 'classifier.pth' }),
+    });
+    setStatus(`Inference complete: ${res.count} frames processed`);
+    await loadSession(session);   // reload with predictions
+    applyFilter();
+  } catch (err) {
+    setStatus(`Inference error: ${err.message}`);
+  } finally {
+    inferBtn.disabled = false;
+    inferBtn.textContent = '▶ Run Inference';
+  }
+});
+
+// ── Auto-save (debounced 800 ms) ──────────────────────────────────────────────
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveStatus.textContent = 'unsaved…';
+  saveTimer = setTimeout(saveAnnotations, 800);
+}
+
+async function saveAnnotations() {
+  if (!session) return;
+  const payload = Object.fromEntries(allImages.map(img => [img.filename, img.label || '']));
+  await apiFetch(`/api/session/${encodeURIComponent(session)}/annotate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  dirty = false;
+  saveStatus.textContent = 'Saved ✓';
+  setTimeout(() => { if (!dirty) saveStatus.textContent = ''; }, 2000);
+}
+
+// ── Progress ──────────────────────────────────────────────────────────────────
+function labeledCountAll() {
+  return allImages.filter(img => img.label).length;
+}
+
+function updateProgress() {
+  const total = filtered.length;
+  const done  = filtered.filter(i => allImages[i].label).length;
+  const pct   = total ? Math.round(done / total * 100) : 0;
+  progressFill.style.width = pct + '%';
+  progressText.textContent = `${done}/${total} (${pct}%)`;
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+const KEY_MAP = {};
+for (let i = 0; i < 9; i++)  KEY_MAP[String(i + 1)] = i;
+for (let i = 0; i < 9; i++)  KEY_MAP[String.fromCharCode(97 + i)] = i + 9;
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.ctrlKey) {
+    if (e.key === 's') { e.preventDefault(); saveAnnotations(); }
+    return;
+  }
+  switch (e.key) {
+    case ' ':
+      e.preventDefault(); acceptPrediction(); return;
+    case 'Enter':
+      e.preventDefault(); acceptPrediction(); return;
+    case 'ArrowRight': case 'ArrowDown':
+      e.preventDefault();
+      if (curFiltered + 1 < filtered.length) showFiltered(curFiltered + 1);
+      return;
+    case 'ArrowLeft': case 'ArrowUp':
+      e.preventDefault();
+      if (curFiltered > 0) showFiltered(curFiltered - 1);
+      return;
+  }
+  const tagIdx = KEY_MAP[e.key];
+  if (tagIdx !== undefined && tagIdx < tags.length) {
+    applyCorrection(tags[tagIdx]);
+  }
+});
+
+acceptBtn.addEventListener('click', acceptPrediction);
+
+window.addEventListener('beforeunload', e => {
+  if (dirty) { e.preventDefault(); e.returnValue = ''; }
+});
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
+function confCls(c) {
+  return c >= 0.9 ? 'conf-high' : c >= 0.7 ? 'conf-mid' : 'conf-low';
+}
+function setStatus(msg) { statusbar.textContent = msg; }
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+async function apiFetch(url, opts) {
+  const r = await fetch(url, opts);
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); msg = j.error || msg; } catch {}
+    throw new Error(msg);
+  }
+  return r.json();
+}
+
+init().catch(err => setStatus('Error: ' + err.message));
+</script>
+</body>
+</html>
