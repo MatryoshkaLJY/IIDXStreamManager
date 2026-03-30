@@ -69,6 +69,7 @@ This state machine manages the game flow of beatmania IIDX, tracking transitions
 | std_retry_count | integer | Standard mode retry count per song | 0 on S_SONGSEL→S_PLAY, S_INTER→S_PLAY | +1 on S_DEATH→S_PLAY |
 | dan_song_count | integer | Dan mode song count | 0 on MODESEL→D_SEL, LOGOUT, IDLE entry | +1 on D_SEL→D_PLAY or D_INTER_S→D_PLAY |
 | blank_counter | integer | Consecutive blank event counter | 0 on non-blank events | +1 on each blank event, reset after threshold (5) |
+| play_type | integer | Play mode type: 1=play1, 2=play2, 3=play12, 4=playd | 0 on LOGOUT, IDLE entry | Set on PLAY state entry based on event (play1→1, play2→2, play12→3, playd→4) |
 
 ## Actions
 
@@ -92,6 +93,11 @@ This state machine manages the game flow of beatmania IIDX, tracking transitions
 | init_all_counters | Initialize all mode counters to 0 |
 | increment_blank_counter | Increment blank_counter by 1 |
 | reset_blank_counter | Reset blank_counter to 0 |
+| init_play_type | Initialize play_type to 0 |
+| set_play_type_1 | Set play_type to 1 (play1/1P mode) |
+| set_play_type_2 | Set play_type to 2 (play2/2P mode) |
+| set_play_type_3 | Set play_type to 3 (play12/versus mode) |
+| set_play_type_4 | Set play_type to 4 (playd/double play mode) |
 
 ## Events (27 total)
 
@@ -136,7 +142,11 @@ LOGOUT --blank--> IDLE
 ### Arena Mode Flow
 ```
 MODESEL --await--> A_WAIT --songsel--> A_SONGSEL --aconfirm--> A_CONFIRM
-  --[play1/play2/play12/playd]--> A_PLAY --score--> A_SCORE --interlude--> A_INTER
+  --play1--> A_PLAY(pt=1) --score--> A_SCORE --interlude--> A_INTER
+  --arank--> A_RANK --asum--> A_SUM --entry--> LOGOUT
+
+MODESEL --await--> A_WAIT --songsel--> A_SONGSEL --aconfirm--> A_CONFIRM
+  --play2--> A_PLAY(pt=2) --score--> A_SCORE --interlude--> A_INTER
   --arank--> A_RANK --asum--> A_SUM --entry--> LOGOUT
 
 # Loop paths
@@ -146,7 +156,7 @@ A_PLAY --interlude--> A_INTER --aconfirm--> A_CONFIRM
 ### Battle Mode Flow
 ```
 MODESEL --bwait--> B_WAIT --bsel--> B_MODESEL --songsel--> B_SONGSEL
-  --aconfirm--> B_CONFIRM --[play1/play2/play12/playd]--> B_PLAY --score--> B_SCORE
+  --aconfirm--> B_CONFIRM --play1--> B_PLAY(pt=1) --score--> B_SCORE
   --interlude--> B_INTER --brank--> B_RANK --entry--> LOGOUT
 
 # Loop paths
@@ -155,29 +165,29 @@ B_PLAY --interlude--> B_INTER --aconfirm--> B_CONFIRM
 
 ### Standard Mode Flow
 ```
-MODESEL --songsel--> S_SONGSEL --[play1/play2/play12/playd]--> S_PLAY
+MODESEL --songsel--> S_SONGSEL --play1--> S_PLAY(pt=1)
 
 # Normal path
 S_PLAY --interlude--> S_INTER --entry--> LOGOUT
 
 # Score path
-S_PLAY --score--> S_SCORE --interlude--> S_INTER --[play]--> S_PLAY
+S_PLAY --score--> S_SCORE --interlude--> S_INTER --play1--> S_PLAY(pt=1)
 
 # Death paths
 S_PLAY --death--> S_DEATH
-S_DEATH --[play]--> S_PLAY
+S_DEATH --play1--> S_PLAY(pt=1)
 S_DEATH --score--> S_SCORE
 S_DEATH --interlude--> S_INTER
 ```
 
 ### Dan Mode Flow
 ```
-MODESEL --dansel--> D_SEL --[play]--> D_PLAY
+MODESEL --dansel--> D_SEL --play1--> D_PLAY(pt=1)
 
 # Success path
 D_PLAY --interlude--> D_INTER_S --danscore--> D_RANK --entry--> LOGOUT
 D_PLAY --score--> D_SCORE_S --interlude--> D_INTER_S
-D_INTER_S --[play]--> D_PLAY
+D_INTER_S --play1--> D_PLAY(pt=1)
 
 # Death path
 D_PLAY --death--> D_DEATH --interlude--> D_INTER_D
@@ -190,11 +200,41 @@ D_INTER_D --danscore--> D_RANK
 - `* --entry--> IDLE` - Any state except IDLE, ENTRY, LOGOUT, A_SUM, B_RANK, S_INTER, D_RANK transitions to IDLE on entry event
 - `* --blank[n>=5]--> IDLE` - After 5 consecutive blank events, reset to IDLE (with counter reset)
 
+## Output Format
+
+### JSON Response Structure
+
+The state machine returns a JSON object for each processed event with the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | ISO 8601 timestamp |
+| `input` | string | The input event |
+| `old_state` | string | State before processing |
+| `current_state` | string | State after processing |
+| `transition` | object \| null | Transition details (null if no state change) |
+| `actions_triggered` | array | Actions executed during transition |
+| `variables_before` | object | Variable values before processing |
+| `variables_after` | object | Variable values after processing |
+| `handled` | boolean | True if event was processed successfully |
+
+### Variables Object Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `arena_round` | integer | Arena round counter |
+| `battle_round` | integer | Battle round counter |
+| `std_song_count` | integer | Standard mode song count |
+| `std_retry_count` | integer | Standard mode retry count |
+| `dan_song_count` | integer | Dan mode song count |
+| `blank_counter` | integer | Consecutive blank counter |
+| `play_type` | integer | Play mode: 0=none, 1=play1, 2=play2, 3=play12, 4=playd |
+
 ## Design Notes
 
-1. **Multi-play Events**: The four play events `[play1, play2, play12, playd]` are interchangeable for gameplay transitions
+1. **Multi-play Events**: The four play events `[play1, play2, play12, playd]` are tracked separately via `play_type` variable
 2. **Dan Mode Score Split**: D_SCORE is split into D_SCORE_S (success) and D_SCORE_D (death) for proper flow tracking
 3. **Loop Paths**: Arena/Battle/Standard modes support loop paths for continuous play sessions
 4. **Global Reset**: Splash event acts as a global reset to IDLE state
-5. **Variable Tracking**: Mode-specific counters track round/song progress; retry counts reset on new song entry
+5. **Variable Tracking**: Mode-specific counters track round/song progress; retry counts reset on new song entry; play_type tracks gameplay mode
 6. **Blank Counter Safety**: Consecutive blank screens (threshold=5) trigger automatic reset to prevent stuck states

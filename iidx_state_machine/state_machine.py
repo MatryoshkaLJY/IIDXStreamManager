@@ -218,6 +218,26 @@ class IIDXStateMachine:
         """Increment blank_counter by 1."""
         self.blank_counter += 1
 
+    def _init_play_type(self) -> None:
+        """Initialize play_type to 0."""
+        self.variables['play_type'] = 0
+
+    def _set_play_type_1(self) -> None:
+        """Set play_type to 1 (play1)."""
+        self.variables['play_type'] = 1
+
+    def _set_play_type_2(self) -> None:
+        """Set play_type to 2 (play2)."""
+        self.variables['play_type'] = 2
+
+    def _set_play_type_3(self) -> None:
+        """Set play_type to 3 (play12)."""
+        self.variables['play_type'] = 3
+
+    def _set_play_type_4(self) -> None:
+        """Set play_type to 4 (playd)."""
+        self.variables['play_type'] = 4
+
     def _get_action_handler(self, action_name: str) -> Optional[Callable[[], None]]:
         """Get action handler by name."""
         action_map = {
@@ -234,6 +254,11 @@ class IIDXStateMachine:
             'increment_dan_song_count': self._increment_dan_song_count,
             'reset_blank_counter': self._reset_blank_counter,
             'increment_blank_counter': self._increment_blank_counter,
+            'init_play_type': self._init_play_type,
+            'set_play_type_1': self._set_play_type_1,
+            'set_play_type_2': self._set_play_type_2,
+            'set_play_type_3': self._set_play_type_3,
+            'set_play_type_4': self._set_play_type_4,
             # Event actions - these are logged but don't change state
             'enter_play_mode': lambda: None,
             'exit_play_mode': lambda: None,
@@ -326,7 +351,7 @@ class IIDXStateMachine:
     def _get_counter_values(self) -> Dict[str, Any]:
         """Get current counter variable values."""
         counters = ['arena_round', 'battle_round', 'std_song_count',
-                   'std_retry_count', 'dan_song_count', 'blank_counter']
+                   'std_retry_count', 'dan_song_count', 'blank_counter', 'play_type']
         return {k: self.variables.get(k, self.blank_counter if k == 'blank_counter' else 0)
                 for k in counters}
 
@@ -518,6 +543,8 @@ class IIDXStateMachine:
                     vars_short.append(f"dc={v}")
                 elif k == 'blank_counter':
                     vars_short.append(f"bc={v}")
+                elif k == 'play_type':
+                    vars_short.append(f"pt={v}")
         var_str = f"v: {', '.join(vars_short)}" if vars_short else "v: -"
 
         return f"{state_str} | {action_str} | {var_str}"

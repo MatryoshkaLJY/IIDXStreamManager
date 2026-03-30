@@ -73,8 +73,42 @@ play1
 
 ## Output Format
 
-### Console Output (File Mode)
-Detailed JSON result for each event:
+### JSON Output Structure
+
+Both file mode and TCP mode return results in the following JSON structure:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `timestamp` | string | ISO 8601 timestamp of the event processing |
+| `input` | string | The input event that was processed |
+| `old_state` | string | State before processing the event |
+| `current_state` | string | State after processing the event |
+| `transition` | object \| null | State transition details (null if no state change) |
+| `transition.from` | string | Source state of the transition |
+| `transition.to` | string | Target state of the transition |
+| `transition.event` | string | Event that triggered the transition |
+| `actions_triggered` | array | List of action names executed |
+| `variables_before` | object | Variable values before processing |
+| `variables_after` | object | Variable values after processing |
+| `handled` | boolean | `true` if event was processed, `false` if no transition matched |
+
+### Variables Object
+
+The `variables_before` and `variables_after` objects contain:
+
+| Field | Description |
+|-------|-------------|
+| `arena_round` | Arena mode round counter (ar) |
+| `battle_round` | Battle mode round counter (br) |
+| `std_song_count` | Standard mode song count (sc) |
+| `std_retry_count` | Standard mode retry count (rc) |
+| `dan_song_count` | Dan mode song count (dc) |
+| `blank_counter` | Consecutive blank screen counter (bc) |
+| `play_type` | Play mode type: 0=none, 1=play1, 2=play2, 3=play12, 4=playd (pt) |
+
+### Example JSON Output
+
+**Successful state transition:**
 ```json
 {
   "timestamp": "2026-03-30T18:34:36.781150",
@@ -85,16 +119,86 @@ Detailed JSON result for each event:
     "to": "ENTRY",
     "event": "entry"
   },
-  "actions_triggered": ["init_all_counters"],
-  "variables_before": {...},
-  "variables_after": {...},
+  "actions_triggered": ["init_all_counters", "init_play_type"],
+  "variables_before": {
+    "arena_round": 0,
+    "battle_round": 0,
+    "std_song_count": 0,
+    "std_retry_count": 0,
+    "dan_song_count": 0,
+    "blank_counter": 0,
+    "play_type": 0
+  },
+  "variables_after": {
+    "arena_round": 0,
+    "battle_round": 0,
+    "std_song_count": 0,
+    "std_retry_count": 0,
+    "dan_song_count": 0,
+    "blank_counter": 0,
+    "play_type": 0
+  },
   "current_state": "ENTRY",
   "handled": true
 }
 ```
 
+**No transition matched (unhandled event):**
+```json
+{
+  "timestamp": "2026-03-30T18:34:36.782123",
+  "input": "invalid_event",
+  "old_state": "IDLE",
+  "transition": null,
+  "actions_triggered": [],
+  "variables_before": {
+    "arena_round": 0,
+    "battle_round": 0,
+    "std_song_count": 0,
+    "std_retry_count": 0,
+    "dan_song_count": 0,
+    "blank_counter": 0,
+    "play_type": 0
+  },
+  "variables_after": {},
+  "current_state": "IDLE",
+  "handled": false
+}
+```
+
+**No-op transition (event handled but no state change):**
+```json
+{
+  "timestamp": "2026-03-30T18:34:37.123456",
+  "input": "blank",
+  "old_state": "IDLE",
+  "transition": null,
+  "actions_triggered": ["increment_blank_counter"],
+  "variables_before": {
+    "arena_round": 0,
+    "battle_round": 0,
+    "std_song_count": 0,
+    "std_retry_count": 0,
+    "dan_song_count": 0,
+    "blank_counter": 0,
+    "play_type": 0
+  },
+  "variables_after": {
+    "arena_round": 0,
+    "battle_round": 0,
+    "std_song_count": 0,
+    "std_retry_count": 0,
+    "dan_song_count": 0,
+    "blank_counter": 1,
+    "play_type": 0
+  },
+  "current_state": "IDLE",
+  "handled": true
+}
+```
+
 ### TCP Output
-Same JSON format as console output, sent back to client.
+Same JSON format as console output, sent back to client with newline termination.
 
 ### Log Output
 Structured JSON logs:
@@ -118,7 +222,7 @@ Output format:
 
 Abbreviations:
 - `a:` = actions triggered
-- `v:` = variables (ar=arena, br=battle, sc=std_song, rc=std_retry, dc=dan_song, bc=blank)
+- `v:` = variables (ar=arena, br=battle, sc=std_song, rc=std_retry, dc=dan_song, bc=blank, pt=play_type)
 - `0` prefix = init to 0
 - `+` prefix = increment
 - `-` = no action/state change
@@ -133,6 +237,7 @@ Abbreviations:
 | `std_retry_count` | Standard mode retry count per song |
 | `dan_song_count` | Dan mode song count |
 | `blank_counter` | Consecutive blank screen counter |
+| `play_type` | Play mode type: 1=play1, 2=play2, 3=play12, 4=playd |
 
 ## Project Structure
 
