@@ -481,6 +481,14 @@ transitions:
     guards: []
     actions: []
 
+  # ==================== 全局状态转移 ====================
+  # 任意状态在splash事件后返回IDLE（游戏重启/复位）
+  - from: "*"
+    to: IDLE
+    event: splash
+    guards: []
+    actions: []
+
 
 
 
