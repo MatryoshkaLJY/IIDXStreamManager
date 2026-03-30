@@ -5,7 +5,7 @@ states:
 
   - id: ENTRY
     description: "Player has entered the game, showing entry animation"
-      
+
   - id: MODESEL
     description: "Game entered mode selection"
 
@@ -92,17 +92,54 @@ states:
 
   - id: D_INTER_S
     description: "Player is in interlude after completing a song in Dan course"
-  
+
   - id: D_INTER_D
     description: "Player is in interlude after failing a song in Dan course"
 
   - id: D_RANK
     description: "Player is viewing rank for Dan course"
 
-  
+
+# ==================== Variable Definitions ====================
+variables:
+  - name: arena_round
+    description: "Arena mode round counter"
+    type: integer
+    initial_value: 0
+    scope: global
+
+  - name: battle_round
+    description: "Battle mode round counter"
+    type: integer
+    initial_value: 0
+    scope: global
+
+  - name: std_song_count
+    description: "Standard mode song count"
+    type: integer
+    initial_value: 0
+    scope: global
+
+  - name: std_retry_count
+    description: "Standard mode retry count per song"
+    type: integer
+    initial_value: 0
+    scope: global
+
+  - name: dan_song_count
+    description: "Dan mode song count"
+    type: integer
+    initial_value: 0
+    scope: global
+
+  - name: blank_counter
+    description: "Consecutive blank event counter"
+    type: integer
+    initial_value: 0
+    scope: global
 
 
-# ==================== 事件定义 ====================
+# ==================== Event Definitions ====================
 events:
   - idle          # Attract mode/standby screen
   - splash        # Boot splash screen
@@ -132,463 +169,492 @@ events:
   - asum          # Arena mode summary screen
   - set           # Settings screen
 
-# ==================== 状态转换定义 ====================
+
+# ==================== Action Definitions ====================
+actions:
+  - name: enter_play_mode
+    description: "Triggered when entering any PLAY state"
+
+  - name: exit_play_mode
+    description: "Triggered when exiting any PLAY state"
+
+  - name: get_score
+    description: "Triggered when entering any SCORE state"
+
+  - name: inform_dan_pass
+    description: "Triggered when passing Dan course"
+
+  - name: inform_dan_fail
+    description: "Triggered when failing Dan course"
+
+  - name: init_arena_round
+    description: "Initialize arena_round to 0"
+
+  - name: increment_arena_round
+    description: "Increment arena_round by 1"
+
+  - name: init_battle_round
+    description: "Initialize battle_round to 0"
+
+  - name: increment_battle_round
+    description: "Increment battle_round by 1"
+
+  - name: init_std_song_count
+    description: "Initialize std_song_count to 0"
+
+  - name: increment_std_song_count
+    description: "Increment std_song_count by 1"
+
+  - name: init_std_retry_count
+    description: "Initialize std_retry_count to 0"
+
+  - name: increment_std_retry_count
+    description: "Increment std_retry_count by 1"
+
+  - name: init_dan_song_count
+    description: "Initialize dan_song_count to 0"
+
+  - name: increment_dan_song_count
+    description: "Increment dan_song_count by 1"
+
+  - name: init_all_counters
+    description: "Initialize all mode counters to 0"
+
+  - name: increment_blank_counter
+    description: "Increment blank_counter by 1"
+
+  - name: reset_blank_counter
+    description: "Reset blank_counter to 0"
+
+
+# ==================== State Transition Definitions ====================
 transitions:
-  # IDLE -> ENTRY: 玩家登录
+  # IDLE -> ENTRY: Player login
   - from: IDLE
     to: ENTRY
     event: entry
     guards: []
-    actions: []
+    actions:
+      - type: init_all_counters
 
-  # ENTRY -> MODESEL: 选择游戏模式
+  # ENTRY -> MODESEL: Select game mode
   - from: ENTRY
     to: MODESEL
     event: modesel
     guards: []
     actions: []
 
-  # LOGOUT -> IDLE: 返回待机
+  # LOGOUT -> IDLE: Return to standby
   - from: LOGOUT
     to: IDLE
     event: blank
     guards: []
-    actions: []
+    actions:
+      - type: init_all_counters
 
-  # ==================== Arena模式状态转移 ====================
-  # MODESEL -> A_WAIT: 进入竞技场等待
+  # ==================== Arena Mode State Transitions ====================
+  # MODESEL -> A_WAIT: Enter arena waiting
   - from: MODESEL
     to: A_WAIT
     event: await
     guards: []
-    actions: []
+    actions:
+      - type: init_arena_round
 
-  # A_WAIT -> A_SONGSEL: 选择歌曲
+  # A_WAIT -> A_SONGSEL: Select song
   - from: A_WAIT
     to: A_SONGSEL
     event: songsel
     guards: []
     actions: []
 
-  # A_SONGSEL -> A_CONFIRM: 确认歌曲
+  # A_SONGSEL -> A_CONFIRM: Confirm song
   - from: A_SONGSEL
     to: A_CONFIRM
     event: aconfirm
     guards: []
-    actions: []
+    actions:
+      - type: increment_arena_round
 
-  # A_CONFIRM -> A_PLAY: 开始游戏（任意play模式）
+  # A_CONFIRM -> A_PLAY: Start game (any play mode)
   - from: A_CONFIRM
     to: A_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: enter_play_mode
 
-  # A_PLAY -> A_SCORE: 游戏结束显示分数
+  # A_PLAY -> A_SCORE: Game ended, show score
   - from: A_PLAY
     to: A_SCORE
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
+      - type: get_score
 
-  # A_SCORE -> A_INTER: 进入间幕
+  # A_SCORE -> A_INTER: Enter interlude
   - from: A_SCORE
     to: A_INTER
     event: interlude
     guards: []
     actions: []
 
-  # A_INTER -> A_RANK: 显示排名
+  # A_INTER -> A_RANK: Show ranking
   - from: A_INTER
     to: A_RANK
     event: arank
     guards: []
     actions: []
 
-  # A_RANK -> A_SUM: 显示总结
+  # A_RANK -> A_SUM: Show summary
   - from: A_RANK
     to: A_SUM
     event: asum
     guards: []
     actions: []
 
-  # A_SUM -> LOGOUT: 退出登录
+  # A_SUM -> LOGOUT: Logout
   - from: A_SUM
     to: LOGOUT
     event: entry
     guards: []
     actions: []
 
-  # A_PLAY -> A_INTER: 游戏到间幕的循环路径
+  # A_PLAY -> A_INTER: Game to interlude loop path
   - from: A_PLAY
     to: A_INTER
     event: interlude
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # A_INTER -> A_CONFIRM: 间幕返回确认的循环路径
+  # A_INTER -> A_CONFIRM: Interlude back to confirm loop path
   - from: A_INTER
     to: A_CONFIRM
     event: aconfirm
     guards: []
-    actions: []
+    actions:
+      - type: increment_arena_round
 
-  # ==================== Battle模式状态转移 ====================
-  # MODESEL -> B_WAIT: 进入对战等待
+  # ==================== Battle Mode State Transitions ====================
+  # MODESEL -> B_WAIT: Enter battle waiting
   - from: MODESEL
     to: B_WAIT
     event: bwait
     guards: []
-    actions: []
+    actions:
+      - type: init_battle_round
 
-  # B_WAIT -> B_MODESEL: 选择对战模式
+  # B_WAIT -> B_MODESEL: Select battle mode
   - from: B_WAIT
     to: B_MODESEL
     event: bsel
     guards: []
     actions: []
 
-  # B_MODESEL -> B_SONGSEL: 选择歌曲
+  # B_MODESEL -> B_SONGSEL: Select song
   - from: B_MODESEL
     to: B_SONGSEL
     event: songsel
     guards: []
     actions: []
 
-  # B_SONGSEL -> B_CONFIRM: 确认歌曲
+  # B_SONGSEL -> B_CONFIRM: Confirm song
   - from: B_SONGSEL
     to: B_CONFIRM
     event: aconfirm
     guards: []
-    actions: []
+    actions:
+      - type: increment_battle_round
 
-  # B_CONFIRM -> B_PLAY: 开始游戏（任意play模式）
+  # B_CONFIRM -> B_PLAY: Start game (any play mode)
   - from: B_CONFIRM
     to: B_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: enter_play_mode
 
-  # B_PLAY -> B_SCORE: 游戏结束显示分数
+  # B_PLAY -> B_SCORE: Game ended, show score
   - from: B_PLAY
     to: B_SCORE
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
+      - type: get_score
 
-  # B_SCORE -> B_INTER: 进入间幕
+  # B_SCORE -> B_INTER: Enter interlude
   - from: B_SCORE
     to: B_INTER
     event: interlude
     guards: []
     actions: []
 
-  # B_INTER -> B_RANK: 显示排名
+  # B_INTER -> B_RANK: Show ranking
   - from: B_INTER
     to: B_RANK
     event: brank
     guards: []
     actions: []
 
-  # B_RANK -> LOGOUT: 退出登录
+  # B_RANK -> LOGOUT: Logout
   - from: B_RANK
     to: LOGOUT
     event: entry
     guards: []
     actions: []
 
-  # B_PLAY -> B_INTER: 游戏到间幕的循环路径
+  # B_PLAY -> B_INTER: Game to interlude loop path
   - from: B_PLAY
     to: B_INTER
     event: interlude
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # B_INTER -> B_CONFIRM: 间幕返回确认的循环路径
+  # B_INTER -> B_CONFIRM: Interlude back to confirm loop path
   - from: B_INTER
     to: B_CONFIRM
     event: aconfirm
     guards: []
-    actions: []
+    actions:
+      - type: increment_battle_round
 
-  # ==================== Standard模式状态转移 ====================
-  # MODESEL -> S_SONGSEL: 选择标准模式歌曲
+  # ==================== Standard Mode State Transitions ====================
+  # MODESEL -> S_SONGSEL: Select standard mode song
   - from: MODESEL
     to: S_SONGSEL
     event: songsel
     guards: []
-    actions: []
+    actions:
+      - type: init_std_song_count
 
-  # S_SONGSEL -> S_PLAY: 开始标准模式游戏
+  # S_SONGSEL -> S_PLAY: Start standard mode game
   - from: S_SONGSEL
     to: S_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: increment_std_song_count
+      - type: init_std_retry_count
+      - type: enter_play_mode
 
-  # S_PLAY -> S_INTER: 进入间幕
+  # S_PLAY -> S_INTER: Enter interlude
   - from: S_PLAY
     to: S_INTER
     event: interlude
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # S_INTER -> LOGOUT: 退出登录
+  # S_INTER -> LOGOUT: Logout
   - from: S_INTER
     to: LOGOUT
     event: entry
     guards: []
     actions: []
 
-  # S_PLAY -> S_SCORE: 显示分数
+  # S_PLAY -> S_SCORE: Show score
   - from: S_PLAY
     to: S_SCORE
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
+      - type: get_score
 
-  # S_SCORE -> S_INTER: 分数到间幕
+  # S_SCORE -> S_INTER: Score to interlude
   - from: S_SCORE
     to: S_INTER
     event: interlude
     guards: []
     actions: []
 
-  # S_INTER -> S_PLAY: 间幕返回游戏
+  # S_INTER -> S_PLAY: Interlude back to game
   - from: S_INTER
     to: S_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: increment_std_song_count
+      - type: init_std_retry_count
+      - type: enter_play_mode
 
-  # S_PLAY -> S_DEATH: 歌曲失败
+  # S_PLAY -> S_DEATH: Song failed
   - from: S_PLAY
     to: S_DEATH
     event: death
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # S_DEATH -> S_PLAY: 失败后继续游戏
+  # S_DEATH -> S_PLAY: Continue after failure (retry)
   - from: S_DEATH
     to: S_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: increment_std_retry_count
+      - type: enter_play_mode
 
-  # S_DEATH -> S_SCORE: 失败后显示分数
+  # S_DEATH -> S_SCORE: Show score after failure
   - from: S_DEATH
     to: S_SCORE
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: get_score
 
-  # S_DEATH -> S_INTER: 失败后进入间幕
+  # S_DEATH -> S_INTER: Enter interlude after failure
   - from: S_DEATH
     to: S_INTER
     event: interlude
     guards: []
     actions: []
 
-  # ==================== Dan模式状态转移 ====================
-  # MODESEL -> D_SEL: 选择段位模式
+  # ==================== Dan Mode State Transitions ====================
+  # MODESEL -> D_SEL: Select Dan course
   - from: MODESEL
     to: D_SEL
     event: dansel
     guards: []
-    actions: []
+    actions:
+      - type: init_dan_song_count
 
-  # D_SEL -> D_PLAY: 开始段位游戏
+  # D_SEL -> D_PLAY: Start Dan game
   - from: D_SEL
     to: D_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: increment_dan_song_count
+      - type: enter_play_mode
 
-  # D_PLAY -> D_INTER_S: 完成歌曲后进入间幕
+  # D_PLAY -> D_INTER_S: Enter interlude after completing song
   - from: D_PLAY
     to: D_INTER_S
     event: interlude
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # D_INTER_S -> D_RANK: 显示段位排名
+  # D_INTER_S -> D_RANK: Show Dan ranking (PASS)
   - from: D_INTER_S
     to: D_RANK
     event: danscore
     guards: []
-    actions: []
+    actions:
+      - type: inform_dan_pass
 
-  # D_INTER_S -> D_PLAY: 间幕后继续下一首
+  # D_INTER_S -> D_PLAY: Continue to next song after interlude
   - from: D_INTER_S
     to: D_PLAY
     event: [play1, play2, play12, playd]
     guards: []
-    actions: []
+    actions:
+      - type: increment_dan_song_count
+      - type: enter_play_mode
 
-  # D_RANK -> LOGOUT: 退出登录
+  # D_RANK -> LOGOUT: Logout
   - from: D_RANK
     to: LOGOUT
     event: entry
     guards: []
     actions: []
 
-  # D_PLAY -> D_SCORE_S: 完成歌曲显示分数
+  # D_PLAY -> D_SCORE_S: Show score after completing song
   - from: D_PLAY
     to: D_SCORE_S
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
+      - type: get_score
 
-  # D_SCORE_S -> D_INTER_S: 分数到间幕
+  # D_SCORE_S -> D_INTER_S: Score to interlude
   - from: D_SCORE_S
     to: D_INTER_S
     event: interlude
     guards: []
     actions: []
 
-  # D_PLAY -> D_DEATH: 歌曲失败
+  # D_PLAY -> D_DEATH: Song failed
   - from: D_PLAY
     to: D_DEATH
     event: death
     guards: []
-    actions: []
+    actions:
+      - type: exit_play_mode
 
-  # D_DEATH -> D_INTER_D: 失败后进入间幕
+  # D_DEATH -> D_INTER_D: Enter interlude after failure
   - from: D_DEATH
     to: D_INTER_D
     event: interlude
     guards: []
     actions: []
 
-  # D_DEATH -> D_SCORE_D: 失败显示分数
+  # D_DEATH -> D_SCORE_D: Show score after failure
   - from: D_DEATH
     to: D_SCORE_D
     event: score
     guards: []
-    actions: []
+    actions:
+      - type: get_score
 
-  # D_SCORE_D -> D_INTER_D: 失败分数到间幕
+  # D_SCORE_D -> D_INTER_D: Failure score to interlude
   - from: D_SCORE_D
     to: D_INTER_D
     event: interlude
     guards: []
     actions: []
 
-  # D_INTER_D -> D_RANK: 失败后间幕到排名
+  # D_INTER_D -> D_RANK: Interlude to ranking after failure (FAIL)
   - from: D_INTER_D
     to: D_RANK
     event: danscore
     guards: []
-    actions: []
+    actions:
+      - type: inform_dan_fail
 
-  # ==================== 全局状态转移 ====================
-  # 任意状态在splash事件后返回IDLE（游戏重启/复位）
+  # ==================== Global State Transitions ====================
+  # Any state -> IDLE on splash event (game restart/reset)
   - from: "*"
     to: IDLE
     event: splash
     guards: []
-    actions: []
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  - from: GAMEPLAY
-    to: STAGE_RESULT
-    event: song_finished
-    guards: []
     actions:
+      - type: init_all_counters
+
+  # Global entry reset: Except IDLE, ENTRY, LOGOUT and its predecessor states,
+  # all other states transition to IDLE on entry event
+  - from: "*"
+    to: IDLE
+    event: entry
+    guards:
+      - type: not_in_states
+        states: [IDLE, ENTRY, LOGOUT, A_SUM, B_RANK, S_INTER, D_RANK]
+    actions:
+      - type: init_all_counters
+
+  # Global blank counter: Reset to IDLE after 5 consecutive blank events
+  - from: "*"
+    to: IDLE
+    event: blank
+    guards:
+      - type: blank_counter_exceeded
+        threshold: 5
+    actions:
+      - type: init_all_counters
+      - type: reset_blank_counter
+
+  # Non-blank event: Increment and check blank counter
+  - from: "*"
+    to: null  # Keep current state, no transition
+    event: blank
+    guards:
+      - type: blank_counter_not_exceeded
+        threshold: 5
+    actions:
+      - type: increment_blank_counter

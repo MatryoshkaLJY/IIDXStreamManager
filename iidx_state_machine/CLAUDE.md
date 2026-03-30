@@ -59,6 +59,40 @@ This state machine manages the game flow of beatmania IIDX, tracking transitions
 | D_INTER_D | Interlude after failing a song in Dan course |
 | D_RANK | Player is viewing rank for Dan course |
 
+## Variables
+
+| Variable | Type | Description | Initialization | Update Rules |
+|----------|------|-------------|----------------|--------------|
+| arena_round | integer | Arena mode round counter | 0 on A_WAIT, LOGOUT, IDLE entry | +1 on each A_CONFIRM entry |
+| battle_round | integer | Battle mode round counter | 0 on B_WAIT, LOGOUT, IDLE entry | +1 on each B_CONFIRM entry |
+| std_song_count | integer | Standard mode song count | 0 on MODESEL→S_SONGSEL, LOGOUT, IDLE entry | +1 on S_SONGSEL→S_PLAY or S_INTER→S_PLAY |
+| std_retry_count | integer | Standard mode retry count per song | 0 on S_SONGSEL→S_PLAY, S_INTER→S_PLAY | +1 on S_DEATH→S_PLAY |
+| dan_song_count | integer | Dan mode song count | 0 on MODESEL→D_SEL, LOGOUT, IDLE entry | +1 on D_SEL→D_PLAY or D_INTER_S→D_PLAY |
+| blank_counter | integer | Consecutive blank event counter | 0 on non-blank events | +1 on each blank event, reset after threshold (5) |
+
+## Actions
+
+| Action | Trigger Condition |
+|--------|-------------------|
+| enter_play_mode | Entering any PLAY state (A_PLAY, B_PLAY, S_PLAY, D_PLAY) |
+| exit_play_mode | Exiting any PLAY state |
+| get_score | Entering any SCORE state (A_SCORE, B_SCORE, S_SCORE, D_SCORE_S, D_SCORE_D) |
+| inform_dan_pass | D_INTER_S → D_RANK transition (Dan course passed) |
+| inform_dan_fail | D_INTER_D → D_RANK transition (Dan course failed) |
+| init_arena_round | Initialize arena_round to 0 |
+| increment_arena_round | Increment arena_round by 1 |
+| init_battle_round | Initialize battle_round to 0 |
+| increment_battle_round | Increment battle_round by 1 |
+| init_std_song_count | Initialize std_song_count to 0 |
+| increment_std_song_count | Increment std_song_count by 1 |
+| init_std_retry_count | Initialize std_retry_count to 0 |
+| increment_std_retry_count | Increment std_retry_count by 1 |
+| init_dan_song_count | Initialize dan_song_count to 0 |
+| increment_dan_song_count | Increment dan_song_count by 1 |
+| init_all_counters | Initialize all mode counters to 0 |
+| increment_blank_counter | Increment blank_counter by 1 |
+| reset_blank_counter | Reset blank_counter to 0 |
+
 ## Events (27 total)
 
 | Event | Description |
@@ -153,6 +187,8 @@ D_INTER_D --danscore--> D_RANK
 
 ### Global Transitions
 - `* --splash--> IDLE` - Any state can reset to IDLE on splash event (game restart)
+- `* --entry--> IDLE` - Any state except IDLE, ENTRY, LOGOUT, A_SUM, B_RANK, S_INTER, D_RANK transitions to IDLE on entry event
+- `* --blank[n>=5]--> IDLE` - After 5 consecutive blank events, reset to IDLE (with counter reset)
 
 ## Design Notes
 
@@ -160,3 +196,5 @@ D_INTER_D --danscore--> D_RANK
 2. **Dan Mode Score Split**: D_SCORE is split into D_SCORE_S (success) and D_SCORE_D (death) for proper flow tracking
 3. **Loop Paths**: Arena/Battle/Standard modes support loop paths for continuous play sessions
 4. **Global Reset**: Splash event acts as a global reset to IDLE state
+5. **Variable Tracking**: Mode-specific counters track round/song progress; retry counts reset on new song entry
+6. **Blank Counter Safety**: Consecutive blank screens (threshold=5) trigger automatic reset to prevent stuck states
