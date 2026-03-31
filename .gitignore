@@ -5,6 +5,7 @@ iidx_score_reco/data/
 iidx_stream_state_machine
 # Claude files
 **/.claude/
+.vscode/
 # **/CLAUDE.md
 
 # Python cache
