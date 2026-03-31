@@ -21,7 +21,7 @@ OBS Manager - 与 OBS Studio 交互的工具类
     result = obs.capture_and_recognize(
         source_name="video",
         target_size=(224, 224),
-        infer_addr="/tmp/iidx_infer.sock"  # 或 ("127.0.0.1", 9876)
+        infer_addr=("127.0.0.1", 9876)  # 或 Unix socket: "/tmp/iidx_infer.sock"
     )
     print(f"识别结果: {result}")  # 如 "play"
 
@@ -57,7 +57,7 @@ class MachineConfig:
     """Configuration for a single game cabinet."""
     machine_id: str
     source_name: str
-    state_infer_addr: Union[str, Tuple[str, int]] = "/tmp/iidx_infer.sock"
+    state_infer_addr: Union[str, Tuple[str, int]] = ("127.0.0.1", 9876)
     score_infer_addr: Tuple[str, int] = ("127.0.0.1", 9877)
 
 
@@ -199,8 +199,8 @@ class OBSManager:
         Args:
             img: PIL Image 对象
             infer_addr: 推理服务地址
-                       - Unix socket: "/tmp/iidx_infer.sock"
                        - TCP: ("127.0.0.1", 9876)
+                       - Unix socket: "/tmp/iidx_infer.sock"
             image_format: 图像格式
 
         Returns:
@@ -239,7 +239,7 @@ class OBSManager:
     def capture_and_recognize(
         self,
         source_name: str,
-        infer_addr: Union[str, Tuple[str, int]] = "/tmp/iidx_infer.sock",
+        infer_addr: Union[str, Tuple[str, int]] = ("127.0.0.1", 9876),
         target_size: Tuple[int, int] = (224, 224),
         image_format: str = "jpeg"
     ) -> str:
@@ -259,13 +259,13 @@ class OBSManager:
             # Unix socket 模式
             result = obs.capture_and_recognize(
                 source_name="video",
-                infer_addr="/tmp/iidx_infer.sock"
+                infer_addr=("127.0.0.1", 9876)
             )
 
-            # TCP 模式
+            # Unix socket 模式
             result = obs.capture_and_recognize(
                 source_name="video",
-                infer_addr=("127.0.0.1", 9876)
+                infer_addr="/tmp/iidx_infer.sock"
             )
         """
         # 1. 抓取图像
@@ -470,7 +470,7 @@ class OBSManager:
         self,
         machine_id: str,
         source_name: str,
-        state_infer_addr: Union[str, Tuple[str, int]] = "/tmp/iidx_infer.sock",
+        state_infer_addr: Union[str, Tuple[str, int]] = ("127.0.0.1", 9876),
         score_infer_addr: Tuple[str, int] = ("127.0.0.1", 9877)
     ) -> None:
         """注册一台游戏机。
@@ -568,10 +568,10 @@ def main():
     parser.add_argument("--port", type=int, default=4455, help="OBS WebSocket 端口")
     parser.add_argument("--password", default=None, help="OBS WebSocket 密码")
     parser.add_argument("--source", default="video", help="视频源名称")
-    parser.add_argument("--infer-sock", default="/tmp/iidx_infer.sock",
-                        help="推理服务 Unix socket 路径")
-    parser.add_argument("--infer-tcp", type=int, default=None,
-                        help="推理服务 TCP 端口（优先于 socket）")
+    parser.add_argument("--infer-sock", default=None,
+                        help="推理服务 Unix socket 路径（优先于 TCP）")
+    parser.add_argument("--infer-tcp", type=int, default=9876,
+                        help="推理服务 TCP 端口")
     parser.add_argument("--size", type=int, nargs=2, default=[224, 224],
                         help="目标尺寸 (宽 高)")
     parser.add_argument("--output", "-o", default=None,
@@ -580,10 +580,10 @@ def main():
     args = parser.parse_args()
 
     # 确定推理服务地址
-    if args.infer_tcp:
-        infer_addr = ("127.0.0.1", args.infer_tcp)
-    else:
+    if args.infer_sock:
         infer_addr = args.infer_sock
+    else:
+        infer_addr = ("127.0.0.1", args.infer_tcp)
 
     # 使用上下文管理器
     with OBSManager(host=args.host, port=args.port, password=args.password) as obs:

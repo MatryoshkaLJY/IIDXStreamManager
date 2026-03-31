@@ -307,18 +307,18 @@ def test_real_obs(password: str = "1145141919", infer_tcp: int = None):
             sources = obs.get_sources()
             print(f"[✓] 可用视频源: {sources}")
 
-            if "video" not in sources:
+            if "kkm" not in sources:
                 print(f"[!] 警告: 'video' 不在源列表中，将使用第一个源: {sources[0] if sources else 'None'}")
                 source_name = sources[0] if sources else None
             else:
-                source_name = "video"
+                source_name = "kkm"
 
             if source_name:
                 # 确定推理服务地址
                 if infer_tcp:
                     infer_addr = ("127.0.0.1", infer_tcp)
                 else:
-                    infer_addr = "/tmp/iidx_infer.sock"
+                    infer_addr = ("127.0.0.1", 9876)
 
                 # 抓取并识别
                 print(f"\n[*] 从 '{source_name}' 抓取图像并识别...")
