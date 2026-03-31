@@ -1,7 +1,8 @@
 # Data directory
 iidx_state_reco/data/
 iidx_score_reco/data/
-iidx_stream_state_machine/tmp
+# Unused state machine dir
+iidx_stream_state_machine
 # Claude files
 **/.claude/
 # **/CLAUDE.md
