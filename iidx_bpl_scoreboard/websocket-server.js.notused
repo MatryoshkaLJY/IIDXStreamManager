@@ -1,0 +1,220 @@
+/**
+ * BPL Scoreboard WebSocket Test Server
+ *
+ * Usage: node websocket-server.js
+ *
+ * Supports commands:
+ * - init: Initialize match with team info and player assignments
+ * - score: Update scores for a specific round
+ * - reset: Reset all scores
+ */
+
+const WebSocket = require('ws');
+
+const PORT = 8080;
+
+const wss = new WebSocket.Server({ port: PORT });
+console.log(`🌐 WebSocket server running on ws://localhost:${PORT}`);
+console.log('');
+
+// Test scenarios
+const testScenarios = {
+    // Initialize a match with mixed 1v1 and 2v2 rounds
+    init: {
+        cmd: 'init',
+        data: {
+            stageName: 'レギュラーステージ',
+            matchNumber: 12,
+            leftTeam: {
+                name: 'SILK HAT',
+                logo: '🎩',
+                colors: {
+                    primary: '#c0c0c0',
+                    secondary: '#ffffff',
+                    accent: '#ff4444'
+                }
+            },
+            rightTeam: {
+                name: 'GAME PANIC',
+                logo: '🎮',
+                colors: {
+                    primary: '#ffd700',
+                    secondary: '#000000',
+                    accent: '#ffaa00'
+                }
+            },
+            matches: [
+                {
+                    type: '1v1',
+                    leftPlayers: ['CHEPY.'],
+                    rightPlayers: ['TAKA.S'],
+                    theme: 'SCRATCH'
+                },
+                {
+                    type: '2v2',
+                    leftPlayers: ['LOOT', 'VENUS'],
+                    rightPlayers: ['HINO38', 'YUNA'],
+                    theme: 'CHARGE NOTES'
+                },
+                {
+                    type: '1v1',
+                    leftPlayers: ['IGW.'],
+                    rightPlayers: ['KUREI'],
+                    theme: 'SPEED CHANGE'
+                },
+                {
+                    type: '2v2',
+                    leftPlayers: ['PLAYER-A', 'PLAYER-B'],
+                    rightPlayers: ['PLAYER-C', 'PLAYER-D'],
+                    theme: 'FINAL BATTLE'
+                }
+            ]
+        }
+    },
+
+    // Score updates for each round
+    scoreRound1: {
+        cmd: 'score',
+        data: { round: 1, leftScore: 2, rightScore: 0 }
+    },
+
+    scoreRound2: {
+        cmd: 'score',
+        data: { round: 2, leftScore: 4, rightScore: 0 }
+    },
+
+    scoreRound3: {
+        cmd: 'score',
+        data: { round: 3, leftScore: 3, rightScore: 3 }
+    },
+
+    scoreRound4: {
+        cmd: 'score',
+        data: { round: 4, leftScore: 1, rightScore: 2 }
+    },
+
+    reset: {
+        cmd: 'reset'
+    }
+};
+
+// Connected clients
+let clients = [];
+
+wss.on('connection', (ws) => {
+    console.log('🔗 Client connected');
+    clients.push(ws);
+
+    // Send initial init command after a short delay
+    setTimeout(() => {
+        sendToClient(ws, testScenarios.init);
+        console.log('📤 Sent: init command');
+    }, 500);
+
+    // Simulate score updates
+    let round = 1;
+    const scoreInterval = setInterval(() => {
+        if (round <= 4 && ws.readyState === WebSocket.OPEN) {
+            const scoreCmd = testScenarios[`scoreRound${round}`];
+            sendToClient(ws, scoreCmd);
+            console.log(`📤 Sent: score for round ${round}`);
+            round++;
+        } else if (round > 4) {
+            clearInterval(scoreInterval);
+        }
+    }, 3000); // Update every 3 seconds
+
+    ws.on('message', (message) => {
+        try {
+            const data = JSON.parse(message);
+            console.log('📨 Received:', data);
+
+            // Broadcast to all clients except sender
+            clients.forEach(client => {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(message);
+                }
+            });
+        } catch (e) {
+            console.log('📨 Raw message:', message.toString());
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('🔌 Client disconnected');
+        clients = clients.filter(c => c !== ws);
+        clearInterval(scoreInterval);
+    });
+
+    ws.on('error', (err) => {
+        console.error('❌ WebSocket error:', err);
+    });
+});
+
+function sendToClient(ws, data) {
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(data));
+    }
+}
+
+function broadcast(data) {
+    clients.forEach(client => {
+        sendToClient(client, data);
+    });
+}
+
+// Manual control via command line
+console.log('Manual control commands:');
+console.log('  init    - Send init command');
+console.log('  score N L R - Send score for round N (left L, right R)');
+console.log('  reset   - Reset all scores');
+console.log('  exit    - Stop server');
+console.log('');
+
+const readline = require('readline');
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+rl.on('line', (input) => {
+    const args = input.trim().split(' ');
+    const cmd = args[0];
+
+    switch (cmd) {
+        case 'init':
+            broadcast(testScenarios.init);
+            console.log('📤 Broadcast: init');
+            break;
+
+        case 'score':
+            if (args.length >= 4) {
+                const round = parseInt(args[1]);
+                const left = parseInt(args[2]);
+                const right = parseInt(args[3]);
+                broadcast({
+                    cmd: 'score',
+                    data: { round, leftScore: left, rightScore: right }
+                });
+                console.log(`📤 Broadcast: score round ${round} (${left}-${right})`);
+            } else {
+                console.log('Usage: score <round> <left> <right>');
+            }
+            break;
+
+        case 'reset':
+            broadcast(testScenarios.reset);
+            console.log('📤 Broadcast: reset');
+            break;
+
+        case 'exit':
+        case 'quit':
+            console.log('👋 Stopping server...');
+            wss.close();
+            rl.close();
+            process.exit(0);
+
+        default:
+            console.log('Unknown command:', cmd);
+    }
+});

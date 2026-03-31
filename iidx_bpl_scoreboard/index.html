@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BPL Scoreboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="scoreboard-container">
+        <!-- Background Effects -->
+        <div class="bg-gradient"></div>
+        <div class="grid-overlay"></div>
+        <div class="glow-effect"></div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="bpl-logo">
+                <span class="konami">KONAMI</span>
+                <div class="bpl-text">
+                    <span class="bemani">Bemani</span>
+                    <span class="pro">Pro</span>
+                    <span class="league">League</span>
+                </div>
+            </div>
+            <div class="stage-info">
+                <h1 class="stage-name">レギュラーステージ</h1>
+                <div class="match-number">
+                    <span>第</span>
+                    <span class="number">1</span>
+                    <span>試合</span>
+                </div>
+            </div>
+            <div class="copyright">©</div>
+        </header>
+
+        <!-- Main Scoreboard -->
+        <main class="main-board">
+            <!-- Left Team -->
+            <div class="team-section left-team">
+                <div class="team-header">
+                    <div class="team-logo">🎩</div>
+                    <div class="team-name">SILK HAT</div>
+                </div>
+                <div class="total-score">
+                    <span class="score-value">0</span>
+                    <span class="score-unit">pt</span>
+                </div>
+            </div>
+
+            <!-- VS Divider -->
+            <div class="vs-divider">
+                <div class="vs-arrows">
+                    <span class="arrow-left">◀</span>
+                    <span class="vs-text">VS</span>
+                    <span class="arrow-right">▶</span>
+                </div>
+            </div>
+
+            <!-- Right Team -->
+            <div class="team-section right-team">
+                <div class="total-score">
+                    <span class="score-value">0</span>
+                    <span class="score-unit">pt</span>
+                </div>
+                <div class="team-header">
+                    <div class="team-logo">🎮</div>
+                    <div class="team-name">GAME PANIC</div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Match Details -->
+        <section class="match-details" id="matchDetails">
+            <!-- Match rows will be dynamically generated -->
+        </section>
+
+        <!-- Connection Status -->
+        <div class="connection-status">
+            <span class="status-dot"></span>
+            <span class="status-text">等待连接...</span>
+        </div>
+
+        <!-- Debug Panel (hidden by default) -->
+        <div class="debug-panel" id="debugPanel" style="display: none;">
+            <h3>WebSocket Messages</h3>
+            <div class="message-log" id="messageLog"></div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

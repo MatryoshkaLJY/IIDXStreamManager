@@ -1,0 +1,40 @@
+{
+  "leftTeam": {
+    "name": "SILK HAT",
+    "logo": "🎩",
+    "primaryColor": "#c0c0c0",
+    "secondaryColor": "#ffffff",
+    "accentColor": "#ff4444",
+    "bgGradient": ["#2a2a2a", "#4a4a4a"]
+  },
+  "rightTeam": {
+    "name": "GAME PANIC",
+    "logo": "🎮",
+    "primaryColor": "#ffd700",
+    "secondaryColor": "#000000",
+    "accentColor": "#ffaa00",
+    "bgGradient": ["#1a1a00", "#4a4000"]
+  },
+  "stageName": "レギュラーステージ",
+  "matchNumber": 12,
+  "matches": [
+    { "leftPlayer": "CHEPY.", "rightPlayer": "TAKA.S" },
+    { "leftPlayer": "LOOT", "rightPlayer": "HINO38" },
+    { "leftPlayer": "IGW.", "rightPlayer": "KUREI" },
+    { "leftPlayer": "-", "rightPlayer": "-" }
+  ],
+  "scores": {
+    "leftTotal": 9,
+    "rightTotal": 3,
+    "matchScores": [
+      { "left": 2, "right": 0 },
+      { "left": 4, "right": 0 },
+      { "left": 3, "right": 3 },
+      { "left": null, "right": null }
+    ]
+  },
+  "websocket": {
+    "url": "ws://localhost:8080",
+    "reconnectInterval": 3000
+  }
+}
