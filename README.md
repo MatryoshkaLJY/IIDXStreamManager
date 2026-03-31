@@ -1,4 +1,4 @@
-# IIDX Stream Assistant
+# IIDX Stream Manager
 
 <p align="center">
   <strong>beatmania IIDX 直播辅助工具集</strong> | <strong>beatmania IIDX Stream Assistant Toolset</strong> | <strong>beatmania IIDX 配信支援ツールセット</strong>
