@@ -37,7 +37,8 @@ import io
 import json
 import socket
 import struct
-from typing import Union, Tuple, Optional, List
+from dataclasses import dataclass
+from typing import Union, Tuple, Optional, List, Dict, Any
 from pathlib import Path
 
 try:
@@ -49,6 +50,15 @@ try:
     from PIL import Image
 except ImportError:
     raise ImportError("请安装 pillow: pip install pillow")
+
+
+@dataclass
+class MachineConfig:
+    """Configuration for a single game cabinet."""
+    machine_id: str
+    source_name: str
+    state_infer_addr: Union[str, Tuple[str, int]] = "/tmp/iidx_infer.sock"
+    score_infer_addr: Tuple[str, int] = ("127.0.0.1", 9877)
 
 
 class OBSManager:
@@ -75,6 +85,10 @@ class OBSManager:
         self.password = password
         self.timeout = timeout
         self._client: Optional[obws.ReqClient] = None
+
+        # Multi-machine state tracking
+        self.machines: Dict[str, MachineConfig] = {}
+        self._state_manager: Optional[Any] = None
 
     def connect(self) -> None:
         """连接到 OBS WebSocket"""
@@ -412,6 +426,137 @@ class OBSManager:
                 print(f"保存 {name}: {output_path}")
 
         return results
+
+    # ========== 多机器状态机集成 ==========
+
+    def _import_state_machine_manager(self):
+        """延迟导入 IIDXStateMachineManager，支持同级目录结构。"""
+        try:
+            from iidx_state_machine.state_machine import IIDXStateMachineManager
+            return IIDXStateMachineManager
+        except ImportError as e:
+            import sys
+            import os
+            parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            if parent not in sys.path:
+                sys.path.insert(0, parent)
+            try:
+                from iidx_state_machine.state_machine import IIDXStateMachineManager
+                return IIDXStateMachineManager
+            except ImportError:
+                raise ImportError(
+                    "无法导入 iidx_state_machine。请确保项目根目录在 PYTHONPATH 中。"
+                ) from e
+
+    def init_state_machine(
+        self,
+        config_path: str,
+        log_level: str = "INFO",
+        simple_mode: bool = False
+    ) -> None:
+        """初始化多机器状态机管理器。
+
+        Args:
+            config_path: 状态机 YAML 配置文件路径
+            log_level: 日志级别
+            simple_mode: 是否启用简化输出
+        """
+        IIDXStateMachineManager = self._import_state_machine_manager()
+        self._state_manager = IIDXStateMachineManager(
+            config_path, log_level, simple_mode
+        )
+
+    def register_machine(
+        self,
+        machine_id: str,
+        source_name: str,
+        state_infer_addr: Union[str, Tuple[str, int]] = "/tmp/iidx_infer.sock",
+        score_infer_addr: Tuple[str, int] = ("127.0.0.1", 9877)
+    ) -> None:
+        """注册一台游戏机。
+
+        Args:
+            machine_id: 机器唯一标识
+            source_name: OBS 视频源名称
+            state_infer_addr: 状态识别服务地址
+            score_infer_addr: 分数识别服务地址
+        """
+        self.machines[machine_id] = MachineConfig(
+            machine_id=machine_id,
+            source_name=source_name,
+            state_infer_addr=state_infer_addr,
+            score_infer_addr=score_infer_addr,
+        )
+        if self._state_manager is not None:
+            self._state_manager.add_machine(machine_id)
+
+    def process_frame(self, machine_id: str) -> Dict[str, Any]:
+        """处理单台机器的单帧。
+
+        流程:
+        1. 抓取图像并进行状态识别
+        2. 将识别结果输入状态机
+        3. 若状态机触发 get_score，则抓取分数
+
+        Args:
+            machine_id: 机器唯一标识
+
+        Returns:
+            包含 machine_id、识别标签、状态结果、分数的字典
+        """
+        if machine_id not in self.machines:
+            raise ValueError(f"机器 '{machine_id}' 未注册")
+        if self._state_manager is None:
+            raise RuntimeError(
+                "状态机未初始化，请先调用 init_state_machine()"
+            )
+
+        cfg = self.machines[machine_id]
+
+        # 1. 状态识别
+        label = self.capture_and_recognize(
+            cfg.source_name, cfg.state_infer_addr
+        )
+
+        # 2. 状态机处理
+        state_result = self._state_manager.process_event(machine_id, label)
+
+        # 3. 分数识别（仅在进入 SCORE 状态时触发）
+        scores = None
+        if state_result and "get_score" in state_result.get("actions_triggered", []):
+            scores = self.capture_and_recognize_score(
+                cfg.source_name, cfg.score_infer_addr
+            )
+
+        return {
+            "machine_id": machine_id,
+            "timestamp": state_result.get("timestamp") if state_result else None,
+            "label": label,
+            "state": state_result,
+            "scores": scores,
+        }
+
+    def run(self, interval: float = 1.0) -> None:
+        """循环轮询所有注册的游戏机。
+
+        Args:
+            interval: 每台机器之间的轮询间隔（秒）
+        """
+        if not self.machines:
+            print("没有注册的游戏机")
+            return
+
+        import time
+        print(f"开始轮询 {len(self.machines)} 台游戏机，间隔 {interval}s")
+        print(f"注册机器: {list(self.machines.keys())}")
+        try:
+            while True:
+                for machine_id in self.machines:
+                    result = self.process_frame(machine_id)
+                    print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
+                time.sleep(interval)
+        except KeyboardInterrupt:
+            print("轮询已停止")
 
 
 def main():

@@ -348,6 +348,99 @@ def test_real_obs(password: str = "1145141919", infer_tcp: int = None):
         return False
 
 
+def test_multi_machine_state_integration():
+    """测试多机器状态机集成：两台机器独立跟踪，进入 SCORE 时自动获取分数"""
+    print("\n" + "="*50)
+    print("测试 5: 多机器状态机集成")
+    print("="*50)
+
+    from obs_manager import OBSManager
+    from iidx_state_machine.state_machine import IIDXStateMachineManager
+
+    # Mock OBS 客户端
+    test_img = create_test_image(640, 480, (255, 0, 0))
+    mock_response = create_mock_obs_response(test_img)
+
+    mock_client = Mock()
+    mock_client.get_version.return_value = Mock(
+        obs_version="29.0.0",
+        obs_web_socket_version="5.0.0"
+    )
+    mock_client.get_source_screenshot.return_value = Mock(
+        image_data=mock_response
+    )
+    mock_client.get_input_list.return_value = Mock(
+        inputs=[{"inputName": "video1"}, {"inputName": "video2"}]
+    )
+
+    obs = OBSManager(host="localhost", port=4455)
+    obs._client = mock_client
+
+    # 初始化状态机（使用同级目录中的配置）
+    sm_config = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "iidx_state_machine",
+        "state_machine.yaml"
+    )
+    obs.init_state_machine(sm_config, log_level="ERROR")
+
+    # 注册两台机器
+    obs.register_machine("cab1", source_name="video1")
+    obs.register_machine("cab2", source_name="video2")
+
+    # 为每台机器准备标签序列
+    cab1_labels = ["entry", "modesel", "songsel", "play1", "score"]
+    cab2_labels = ["entry", "modesel"]
+    call_count = {"cab1": 0, "cab2": 0}
+
+    def mock_capture_and_recognize(source_name, infer_addr=None, target_size=(224, 224), image_format="jpeg"):
+        if source_name == "video1":
+            idx = call_count["cab1"]
+            call_count["cab1"] += 1
+            return cab1_labels[idx]
+        else:
+            idx = call_count["cab2"]
+            call_count["cab2"] += 1
+            return cab2_labels[idx]
+
+    def mock_capture_and_recognize_score(source_name, infer_addr=("127.0.0.1", 9877), target_size=(1920, 1080), rois=None):
+        return {"1pscore": "1234", "2pscore": "5678"}
+
+    with patch.object(obs, "capture_and_recognize", side_effect=mock_capture_and_recognize):
+        with patch.object(obs, "capture_and_recognize_score", side_effect=mock_capture_and_recognize_score):
+            # cab1: 前 4 帧不会触发分数
+            for i in range(4):
+                r = obs.process_frame("cab1")
+                assert r["machine_id"] == "cab1"
+                assert r["scores"] is None, f"第 {i+1} 帧不应触发分数"
+                print(f"  cab1 frame {i+1}: {r['label']} -> {r['state']['current_state']}")
+
+            # cab1 第 5 帧：score -> 触发 get_score -> 获取分数
+            r = obs.process_frame("cab1")
+            assert r["state"]["current_state"] == "S_SCORE"
+            assert "get_score" in r["state"].get("actions_triggered", [])
+            assert r["scores"] is not None
+            assert r["scores"]["1pscore"] == "1234"
+            print(f"  cab1 frame 5: {r['label']} -> {r['state']['current_state']} (scores={r['scores']})")
+
+            # cab2: entry -> ENTRY
+            r1 = obs.process_frame("cab2")
+            assert r1["state"]["current_state"] == "ENTRY"
+            print(f"  cab2 frame 1: {r1['label']} -> {r1['state']['current_state']}")
+
+            # cab2: modesel -> MODESEL
+            r2 = obs.process_frame("cab2")
+            assert r2["state"]["current_state"] == "MODESEL"
+            print(f"  cab2 frame 2: {r2['label']} -> {r2['state']['current_state']}")
+
+            # 验证 cab1 仍在 S_SCORE，不受 cab2 影响
+            assert obs._state_manager.get_machine_state("cab1")["current_state"] == "S_SCORE"
+            assert obs._state_manager.get_machine_state("cab2")["current_state"] == "MODESEL"
+
+    print("\n[✓] 测试 5 通过!")
+    return True
+
+
 def main():
     import argparse
 
@@ -355,8 +448,8 @@ def main():
     parser.add_argument("--real", action="store_true", help="运行实际测试（需要 OBS 和推理服务）")
     parser.add_argument("--password", default="1145141919", help="OBS WebSocket 密码")
     parser.add_argument("--infer-tcp", type=int, default=None, help="推理服务 TCP 端口")
-    parser.add_argument("--test", choices=["1", "2", "3", "4", "all"], default="all",
-                        help="运行指定测试 (1=抓取源, 2=抓取识别, 3=保存文件, 4=错误处理)")
+    parser.add_argument("--test", choices=["1", "2", "3", "4", "5", "all"], default="all",
+                        help="运行指定测试 (1=抓取源, 2=抓取识别, 3=保存文件, 4=错误处理, 5=多机器状态机集成)")
 
     args = parser.parse_args()
 
@@ -374,6 +467,7 @@ def main():
         ("2", test_capture_and_recognize_mock, "抓取并识别"),
         ("3", test_save_to_file, "保存到文件"),
         ("4", test_error_handling, "错误处理"),
+        ("5", test_multi_machine_state_integration, "多机器状态机集成"),
     ]
 
     results = []

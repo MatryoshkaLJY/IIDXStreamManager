@@ -1,3 +1,3 @@
-from .obs_manager import OBSManager
+from .obs_manager import OBSManager, MachineConfig
 
-__all__ = ["OBSManager"]
+__all__ = ["OBSManager", "MachineConfig"]

@@ -647,6 +647,79 @@ class JsonLogFormatter(logging.Formatter):
         return json.dumps(log_data, ensure_ascii=False)
 
 
+class IIDXStateMachineManager:
+    """Manager for multiple IIDXStateMachine instances.
+
+    Each machine (cabinet) gets its own isolated state machine,
+    allowing concurrent tracking of multiple game sessions.
+    """
+
+    def __init__(self, config_path: str, log_level: str = "INFO", simple_mode: bool = False):
+        """Initialize the manager.
+
+        Args:
+            config_path: Path to YAML configuration file
+            log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
+            simple_mode: Enable simple output format for local testing
+        """
+        self.config_path = config_path
+        self.log_level = log_level
+        self.simple_mode = simple_mode
+        self.machines: Dict[str, IIDXStateMachine] = {}
+
+    def add_machine(self, machine_id: str) -> None:
+        """Add a new machine state tracker."""
+        if machine_id in self.machines:
+            raise ValueError(f"Machine '{machine_id}' already exists")
+        self.machines[machine_id] = IIDXStateMachine(
+            self.config_path, self.log_level, self.simple_mode
+        )
+
+    def remove_machine(self, machine_id: str) -> None:
+        """Remove a machine state tracker."""
+        if machine_id in self.machines:
+            del self.machines[machine_id]
+
+    def process_event(self, machine_id: str, event: str) -> Dict[str, Any]:
+        """Process an event for a specific machine.
+
+        Args:
+            machine_id: Machine identifier
+            event: Input event string
+
+        Returns:
+            Result dictionary with machine_id injected
+        """
+        if machine_id not in self.machines:
+            raise ValueError(f"Machine '{machine_id}' not found")
+        result = self.machines[machine_id].process_event(event)
+        result["machine_id"] = machine_id
+        return result
+
+    def get_machine_state(self, machine_id: str) -> Dict[str, Any]:
+        """Get current state info for a specific machine.
+
+        Args:
+            machine_id: Machine identifier
+
+        Returns:
+            Dictionary with current_state, variables, and blank_counter
+        """
+        if machine_id not in self.machines:
+            raise ValueError(f"Machine '{machine_id}' not found")
+        sm = self.machines[machine_id]
+        return {
+            "machine_id": machine_id,
+            "current_state": sm.current_state,
+            "variables": sm.variables.copy(),
+            "blank_counter": sm.blank_counter,
+        }
+
+    def list_machines(self) -> List[str]:
+        """Return list of registered machine IDs."""
+        return list(self.machines.keys())
+
+
 def main():
     """Main entry point."""
     import argparse
