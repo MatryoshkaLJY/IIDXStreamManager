@@ -205,16 +205,18 @@ html, body {
 
 .player-node {
     position: absolute;
-    width: 160px;
-    padding: 10px 12px;
+    width: 200px;
+    height: 60px;
+    padding: 8px 12px;
     background: linear-gradient(135deg,
         rgba(255, 255, 255, 0.08) 0%,
         rgba(255, 255, 255, 0.03) 100%);
     border: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: 10px;
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
     z-index: 10;
     transition: all 0.3s ease;
     backdrop-filter: blur(4px);
@@ -261,19 +263,20 @@ html, body {
     50% { box-shadow: 0 0 35px rgba(0, 255, 136, 0.5); }
 }
 
-/* Player Node Content */
+/* Player Node Content - Horizontal Layout */
 .player-rank {
     position: absolute;
     top: -10px;
-    left: 15px;
+    left: 10px;
     font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 900;
     color: var(--bg-dark);
     background: var(--theme-cyan);
-    padding: 2px 10px;
-    border-radius: 10px;
+    padding: 2px 8px;
+    border-radius: 8px;
     text-shadow: none;
+    z-index: 15;
 }
 
 .player-node.rank-1 .player-rank {
@@ -291,90 +294,97 @@ html, body {
     color: var(--bg-dark);
 }
 
+/* Left side: Name and Score stacked */
+.player-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
 .player-name {
     font-family: 'Rajdhani', sans-serif;
-    font-size: 22px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--text-primary);
-    text-align: center;
-    letter-spacing: 1px;
-    margin-top: 5px;
+    text-align: left;
+    letter-spacing: 0.5px;
+    line-height: 1.2;
 }
 
 .player-score {
     font-family: 'Orbitron', sans-serif;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-secondary);
-    text-align: center;
+    text-align: left;
     opacity: 0.8;
 }
 
+/* Right side: Large bold points */
 .player-points {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 18px;
-    font-weight: 700;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 28px;
+    font-weight: 900;
     color: var(--theme-cyan);
-    text-align: center;
-    text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
-    background: rgba(0, 255, 255, 0.1);
-    padding: 2px 10px;
-    border-radius: 10px;
-    align-self: center;
+    text-align: right;
+    text-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+    min-width: 50px;
+    padding-left: 8px;
 }
 
 /* ============================================
-   Quarterfinals Positioning (Outer Ring)
+   Quarterfinals Positioning (Outer Ring) - Compact Layout
    ============================================ */
 
 /* Group A - Left Top */
-.quarterfinal#A1 { left: 50px; top: 100px; }
-.quarterfinal#A2 { left: 50px; top: 220px; }
-.quarterfinal#A3 { left: 50px; top: 340px; }
-.quarterfinal#A4 { left: 50px; top: 460px; }
+.quarterfinal#A1 { left: 30px; top: 80px; }
+.quarterfinal#A2 { left: 30px; top: 150px; }
+.quarterfinal#A3 { left: 30px; top: 220px; }
+.quarterfinal#A4 { left: 30px; top: 290px; }
 
 /* Group B - Left Bottom */
-.quarterfinal#B1 { left: 50px; top: 580px; }
-.quarterfinal#B2 { left: 50px; top: 700px; }
-.quarterfinal#B3 { left: 50px; top: 820px; }
-.quarterfinal#B4 { left: 50px; top: 940px; }
+.quarterfinal#B1 { left: 30px; top: 390px; }
+.quarterfinal#B2 { left: 30px; top: 460px; }
+.quarterfinal#B3 { left: 30px; top: 530px; }
+.quarterfinal#B4 { left: 30px; top: 600px; }
 
 /* Group C - Right Top */
-.quarterfinal#C1 { right: 50px; top: 100px; }
-.quarterfinal#C2 { right: 50px; top: 220px; }
-.quarterfinal#C3 { right: 50px; top: 340px; }
-.quarterfinal#C4 { right: 50px; top: 460px; }
+.quarterfinal#C1 { right: 30px; top: 80px; }
+.quarterfinal#C2 { right: 30px; top: 150px; }
+.quarterfinal#C3 { right: 30px; top: 220px; }
+.quarterfinal#C4 { right: 30px; top: 290px; }
 
 /* Group D - Right Bottom */
-.quarterfinal#D1 { right: 50px; top: 580px; }
-.quarterfinal#D2 { right: 50px; top: 700px; }
-.quarterfinal#D3 { right: 50px; top: 820px; }
-.quarterfinal#D4 { right: 50px; top: 940px; }
+.quarterfinal#D1 { right: 30px; top: 390px; }
+.quarterfinal#D2 { right: 30px; top: 460px; }
+.quarterfinal#D3 { right: 30px; top: 530px; }
+.quarterfinal#D4 { right: 30px; top: 600px; }
 
 /* ============================================
-   Semifinals Positioning (Middle Ring)
+   Semifinals Positioning (Middle Ring) - Compact Layout
    ============================================ */
 
 /* Group AB - Left Side */
-.semifinal#AB1 { left: 450px; top: 160px; }
-.semifinal#AB2 { left: 450px; top: 300px; }
-.semifinal#AB3 { left: 450px; top: 540px; }
-.semifinal#AB4 { left: 450px; top: 680px; }
+.semifinal#AB1 { left: 320px; top: 130px; }
+.semifinal#AB2 { left: 320px; top: 200px; }
+.semifinal#AB3 { left: 320px; top: 420px; }
+.semifinal#AB4 { left: 320px; top: 490px; }
 
 /* Group CD - Right Side */
-.semifinal#CD1 { right: 450px; top: 160px; }
-.semifinal#CD2 { right: 450px; top: 300px; }
-.semifinal#CD3 { right: 450px; top: 540px; }
-.semifinal#CD4 { right: 450px; top: 680px; }
+.semifinal#CD1 { right: 320px; top: 130px; }
+.semifinal#CD2 { right: 320px; top: 200px; }
+.semifinal#CD3 { right: 320px; top: 420px; }
+.semifinal#CD4 { right: 320px; top: 490px; }
 
 /* ============================================
-   Finals Positioning (Inner Ring)
+   Finals Positioning (Inner Ring) - Compact Layout
    ============================================ */
 
-.final#F1 { left: 830px; top: 300px; }
-.final#F2 { left: 830px; top: 440px; }
-.final#F3 { left: 1050px; top: 300px; }
-.final#F4 { left: 1050px; top: 440px; }
+.final#F1 { left: 760px; top: 200px; }
+.final#F2 { left: 760px; top: 270px; }
+.final#F3 { left: 960px; top: 200px; }
+.final#F4 { left: 960px; top: 270px; }
 
 /* ============================================
    Group Labels
@@ -394,15 +404,15 @@ html, body {
     z-index: 5;
 }
 
-.group-a-label { left: 60px; top: 70px; color: var(--theme-cyan); }
-.group-b-label { left: 60px; top: 550px; color: var(--theme-cyan); }
-.group-c-label { right: 60px; top: 70px; color: var(--theme-pink); }
-.group-d-label { right: 60px; top: 550px; color: var(--theme-pink); }
-.group-ab-label { left: 495px; top: 130px; color: var(--theme-purple); }
-.group-cd-label { right: 495px; top: 130px; color: var(--theme-purple); }
+.group-a-label { left: 40px; top: 55px; color: var(--theme-cyan); }
+.group-b-label { left: 40px; top: 365px; color: var(--theme-cyan); }
+.group-c-label { right: 40px; top: 55px; color: var(--theme-pink); }
+.group-d-label { right: 40px; top: 365px; color: var(--theme-pink); }
+.group-ab-label { left: 365px; top: 105px; color: var(--theme-purple); }
+.group-cd-label { right: 365px; top: 105px; color: var(--theme-purple); }
 .finals-label {
     left: 50%;
-    top: 260px;
+    top: 170px;
     transform: translateX(-50%);
     color: var(--theme-gold);
     border-color: var(--theme-gold);
@@ -415,7 +425,7 @@ html, body {
 .champion-trophy {
     position: absolute;
     left: 50%;
-    top: 540px;
+    top: 420px;
     transform: translate(-50%, -50%);
     width: 200px;
     height: 200px;

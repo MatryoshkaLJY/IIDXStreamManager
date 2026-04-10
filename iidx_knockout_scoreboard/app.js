@@ -596,7 +596,7 @@ class TournamentApp {
 
         if (data.points !== undefined) {
             const pointsEl = node.querySelector('.player-points');
-            if (pointsEl) pointsEl.textContent = `${data.points} pts`;
+            if (pointsEl) pointsEl.textContent = data.points;
         }
 
         if (data.rank !== undefined) {

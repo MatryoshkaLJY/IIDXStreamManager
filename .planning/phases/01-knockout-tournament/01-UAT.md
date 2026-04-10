@@ -1,16 +1,16 @@
 ---
-status: fix_executed
+status: layout_updated
 phase: 01-knockout-tournament
 source:
   - 01-01-SUMMARY.md
   - 01-02-SUMMARY.md
   - 01-03-SUMMARY.md
 started: 2026-04-10T12:00:00Z
-updated: 2026-04-11T01:00:00Z
+updated: 2026-04-11T12:00:00Z
 gaps_diagnosed: 4
 fix_plans_created: 4
 fix_plans_executed: 4
-commit: 2d97626
+layout_updated: true
 ---
 
 ## Current Test
@@ -244,7 +244,38 @@ blocked: 1
 - User explicitly requested removal of SVG connection lines
 - Score/points text sizing reversed from user expectation
 
+## Layout Update (2026-04-11)
+
+Based on user feedback, the player node layout has been redesigned:
+
+### Changes Made
+
+**Node Structure:**
+- Changed from vertical layout to horizontal layout
+- Node size: 200px × 60px (previously ~160px × variable)
+- Left side: Player name (top) + Score (bottom)
+- Right side: Points (large, bold number only, no "pts" suffix)
+
+**Visual Updates:**
+- Player name: 18px, left-aligned
+- Player score: 12px, small text below name
+- Player points: 28px, bold Orbitron font, cyan color with glow
+- Rank badge: Repositioned to top-left of node
+
+**Positioning Adjustments:**
+- All nodes repositioned to fit within 1920×1080
+- Group A/B/C/D: Tighter vertical spacing (70px between nodes)
+- Group AB/CD: Moved closer to center
+- Finals: Positioned above champion trophy
+- Champion trophy: Moved to top: 420px
+- All group labels repositioned accordingly
+
+**Files Modified:**
+- `index.html` - Updated all 28 player nodes with new structure
+- `style.css` - New horizontal layout CSS, updated positioning
+- `app.js` - Points display now shows number only (no "pts" suffix)
+
 ## Next Steps
 
-1. Execute fix plans: `/gsd-execute-phase 1 --gaps-only`
-2. Re-run verification: `/gsd-verify-work 1`
+1. Re-run verification: `/gsd-verify-work 1`
+2. Confirm all 16 players visible within 1920×1080 bounds
