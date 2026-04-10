@@ -13,7 +13,7 @@
         { "id": "chepy", "name": "CHEPY.", "role": "veteran" },
         { "id": "loot", "name": "LOOT", "role": "veteran" },
         { "id": "igw", "name": "IGW.", "role": "regular" },
-        { "id": "venus", "name": "VENUS", "role": "regular" }
+        { "id": "neon", "name": "NEON", "role": "regular" }
       ]
     },
     "game_panic": {
@@ -29,7 +29,7 @@
         { "id": "taka_s", "name": "TAKA.S", "role": "veteran" },
         { "id": "hino38", "name": "HINO38", "role": "veteran" },
         { "id": "kurei", "name": "KUREI", "role": "regular" },
-        { "id": "yuna", "name": "YUNA", "role": "regular" }
+        { "id": "charm", "name": "CHARM", "role": "regular" }
       ]
     },
     "round1": {
@@ -42,14 +42,15 @@
         "accent": "#ee5a5a"
       },
       "players": [
-        { "id": "dj_ikura", "name": "DJ IKURA", "role": "veteran" },
-        { "id": "sakura", "name": "SAKURA", "role": "veteran" },
-        { "id": "mao", "name": "MAO", "role": "regular" }
+        { "id": "u_taka", "name": "U_TAKA", "role": "veteran" },
+        { "id": "cyberx", "name": "CYBERX", "role": "veteran" },
+        { "id": "takwan", "name": "TAKWAN", "role": "veteran" },
+        { "id": "leo", "name": "LEO", "role": "regular" }
       ]
     },
-    "apa": {
-      "id": "apa",
-      "name": "APA",
+    "apina_vrames": {
+      "id": "apina_vrames",
+      "name": "APINA VRAMES",
       "logo": "🌟",
       "colors": {
         "primary": "#4ecdc4",
@@ -57,9 +58,10 @@
         "accent": "#44b3ab"
       },
       "players": [
-        { "id": "doron", "name": "DORON", "role": "veteran" },
-        { "id": "ncho", "name": "NCHO", "role": "veteran" },
-        { "id": "potesara", "name": "POTESARA", "role": "regular" }
+        { "id": "ucchie", "name": "UCCHIE", "role": "veteran" },
+        { "id": "wellow", "name": "WELLOW", "role": "veteran" },
+        { "id": "hakuo", "name": "HAKUO", "role": "regular" },
+        { "id": "nagach", "name": "NAGACH", "role": "regular" }
       ]
     }
   },
@@ -128,7 +130,7 @@
             "match_id": "w1_m2",
             "stage": "regular",
             "left_team": "round1",
-            "right_team": "apa",
+            "right_team": "apina_vrames",
             "template": "standard_4round"
           }
         ]
@@ -147,7 +149,7 @@
             "match_id": "w2_m2",
             "stage": "regular",
             "left_team": "game_panic",
-            "right_team": "apa",
+            "right_team": "apina_vrames",
             "template": "standard_5round"
           }
         ]
@@ -159,14 +161,14 @@
             "match_id": "w3_m1",
             "stage": "regular",
             "left_team": "silk_hat",
-            "right_team": "apa",
+            "right_team": "apina_vrames",
             "template": "standard_4round"
           },
           {
             "match_id": "w3_m2",
             "stage": "regular",
             "left_team": "game_panic",
-            "right_team": "round1",
+            "right_team": "apina_vrames",
             "template": "standard_4round"
           }
         ]
