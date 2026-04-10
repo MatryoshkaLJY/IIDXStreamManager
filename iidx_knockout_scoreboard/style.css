@@ -338,10 +338,10 @@ html, body {
    ============================================ */
 
 /* Group A - Left Top */
-.quarterfinal#A1 { left: 30px; top: 80px; }
-.quarterfinal#A2 { left: 30px; top: 150px; }
-.quarterfinal#A3 { left: 30px; top: 220px; }
-.quarterfinal#A4 { left: 30px; top: 290px; }
+.quarterfinal#A1 { left: 30px; top: 50px; }
+.quarterfinal#A2 { left: 30px; top: 120px; }
+.quarterfinal#A3 { left: 30px; top: 190px; }
+.quarterfinal#A4 { left: 30px; top: 260px; }
 
 /* Group B - Left Bottom */
 .quarterfinal#B1 { left: 30px; top: 390px; }
@@ -350,10 +350,10 @@ html, body {
 .quarterfinal#B4 { left: 30px; top: 600px; }
 
 /* Group C - Right Top */
-.quarterfinal#C1 { right: 30px; top: 80px; }
-.quarterfinal#C2 { right: 30px; top: 150px; }
-.quarterfinal#C3 { right: 30px; top: 220px; }
-.quarterfinal#C4 { right: 30px; top: 290px; }
+.quarterfinal#C1 { right: 30px; top: 50px; }
+.quarterfinal#C2 { right: 30px; top: 120px; }
+.quarterfinal#C3 { right: 30px; top: 190px; }
+.quarterfinal#C4 { right: 30px; top: 260px; }
 
 /* Group D - Right Bottom */
 .quarterfinal#D1 { right: 30px; top: 390px; }
@@ -366,25 +366,25 @@ html, body {
    ============================================ */
 
 /* Group AB - Left Side */
-.semifinal#AB1 { left: 320px; top: 130px; }
-.semifinal#AB2 { left: 320px; top: 200px; }
-.semifinal#AB3 { left: 320px; top: 420px; }
-.semifinal#AB4 { left: 320px; top: 490px; }
+.semifinal#AB1 { left: 400px; top: 220px; }
+.semifinal#AB2 { left: 400px; top: 290px; }
+.semifinal#AB3 { left: 400px; top: 360px; }
+.semifinal#AB4 { left: 400px; top: 430px; }
 
 /* Group CD - Right Side */
-.semifinal#CD1 { right: 320px; top: 130px; }
-.semifinal#CD2 { right: 320px; top: 200px; }
-.semifinal#CD3 { right: 320px; top: 420px; }
-.semifinal#CD4 { right: 320px; top: 490px; }
+.semifinal#CD1 { right: 400px; top: 220px; }
+.semifinal#CD2 { right: 400px; top: 290px; }
+.semifinal#CD3 { right: 400px; top: 360px; }
+.semifinal#CD4 { right: 400px; top: 430px; }
 
 /* ============================================
    Finals Positioning (Inner Ring) - Compact Layout
    ============================================ */
 
-.final#F1 { left: 760px; top: 200px; }
-.final#F2 { left: 760px; top: 270px; }
-.final#F3 { left: 960px; top: 200px; }
-.final#F4 { left: 960px; top: 270px; }
+.final#F1 { left: 750px; top: 290px; }
+.final#F2 { left: 750px; top: 360px; }
+.final#F3 { right: 750px; top: 290px; }
+.final#F4 { right: 750px; top: 360px; }
 
 /* ============================================
    Group Labels
@@ -404,15 +404,15 @@ html, body {
     z-index: 5;
 }
 
-.group-a-label { left: 40px; top: 55px; color: var(--theme-cyan); }
-.group-b-label { left: 40px; top: 365px; color: var(--theme-cyan); }
-.group-c-label { right: 40px; top: 55px; color: var(--theme-pink); }
-.group-d-label { right: 40px; top: 365px; color: var(--theme-pink); }
-.group-ab-label { left: 365px; top: 105px; color: var(--theme-purple); }
-.group-cd-label { right: 365px; top: 105px; color: var(--theme-purple); }
+.group-a-label { left: 40px; top: 10px; color: var(--theme-cyan); }
+.group-b-label { left: 40px; top: 355px; color: var(--theme-cyan); }
+.group-c-label { right: 90px; top: 10px; color: var(--theme-pink); }
+.group-d-label { right: 90px; top: 355px; color: var(--theme-pink); }
+.group-ab-label { left: 420px; top: 175px; color: var(--theme-purple); }
+.group-cd-label { right: 440px; top: 175px; color: var(--theme-purple); }
 .finals-label {
     left: 50%;
-    top: 170px;
+    top: 240px;
     transform: translateX(-50%);
     color: var(--theme-gold);
     border-color: var(--theme-gold);
@@ -422,7 +422,7 @@ html, body {
    Champion Trophy
    ============================================ */
 
-.champion-trophy {
+/* .champion-trophy {
     position: absolute;
     left: 50%;
     top: 420px;
@@ -481,7 +481,7 @@ html, body {
     50% {
         box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
     }
-}
+} */
 
 /* ============================================
    Connection Status
