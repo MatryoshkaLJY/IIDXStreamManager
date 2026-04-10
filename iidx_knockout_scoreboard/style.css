@@ -1,0 +1,545 @@
+/* ============================================
+   16-Player Knockout Tournament Scoreboard Styles
+   ============================================ */
+
+:root {
+    /* BPL-compatible color scheme */
+    --bg-dark: #0a0a1a;
+    --bg-gradient-start: #1a1a3e;
+    --bg-gradient-end: #0d0d1f;
+    --border-glow: rgba(0, 255, 255, 0.3);
+    --text-primary: #ffffff;
+    --text-secondary: #a0a0a0;
+
+    /* Theme colors */
+    --theme-cyan: #00ffff;
+    --theme-pink: #ff6b9d;
+    --theme-gold: #ffd700;
+    --theme-purple: #9d4edd;
+
+    /* Player state colors */
+    --player-active: rgba(0, 200, 255, 0.15);
+    --player-active-border: rgba(0, 255, 255, 0.5);
+    --player-eliminated: rgba(255, 68, 68, 0.1);
+    --player-eliminated-border: rgba(255, 68, 68, 0.3);
+    --player-advancing: rgba(0, 255, 136, 0.2);
+    --player-advancing-border: rgba(0, 255, 136, 0.6);
+
+    /* Path colors */
+    --path-dim: rgba(255, 255, 255, 0.1);
+    --path-lit: rgba(0, 255, 255, 0.6);
+    --path-champion: rgba(255, 215, 0, 0.9);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Rajdhani', sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+}
+
+/* ============================================
+   Tournament Container
+   ============================================ */
+
+.tournament-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ============================================
+   Background Effects
+   ============================================ */
+
+.bg-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background:
+        radial-gradient(ellipse at 20% 50%, rgba(0, 100, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 50%, rgba(255, 107, 157, 0.1) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(157, 78, 221, 0.08) 0%, transparent 60%),
+        linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    z-index: -3;
+}
+
+.grid-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+        linear-gradient(rgba(0, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    z-index: -2;
+}
+
+.glow-effect {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(157, 78, 221, 0.15) 0%, transparent 70%);
+    filter: blur(80px);
+    z-index: -1;
+}
+
+/* ============================================
+   Header
+   ============================================ */
+
+.header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px 40px;
+    position: relative;
+    z-index: 10;
+}
+
+.tournament-title {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.title-text {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 42px;
+    font-weight: 900;
+    color: var(--theme-cyan);
+    text-shadow:
+        0 0 20px rgba(0, 255, 255, 0.8),
+        0 0 40px rgba(0, 255, 255, 0.4);
+    letter-spacing: 8px;
+}
+
+.stage-indicator {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--theme-pink);
+    text-shadow: 0 0 10px rgba(255, 107, 157, 0.5);
+    letter-spacing: 4px;
+    background: rgba(255, 107, 157, 0.1);
+    padding: 5px 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 107, 157, 0.3);
+}
+
+/* ============================================
+   Tournament Tree Layout
+   ============================================ */
+
+.tournament-tree {
+    flex: 1;
+    position: relative;
+    width: 1920px;
+    height: 900px;
+}
+
+/* SVG Connection Paths */
+.connection-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1920px;
+    height: 1080px;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.connection-path {
+    fill: none;
+    stroke: var(--path-dim);
+    stroke-width: 2;
+    transition: all 0.5s ease;
+}
+
+.connection-path.lit {
+    stroke: var(--path-lit);
+    stroke-width: 3;
+    filter: drop-shadow(0 0 8px var(--theme-cyan));
+}
+
+.connection-path.champion-path {
+    stroke: var(--path-champion);
+    stroke-width: 4;
+    filter: drop-shadow(0 0 15px var(--theme-gold));
+    animation: championGlow 2s ease-in-out infinite;
+}
+
+@keyframes championGlow {
+    0%, 100% {
+        stroke-opacity: 1;
+        filter: drop-shadow(0 0 15px var(--theme-gold));
+    }
+    50% {
+        stroke-opacity: 0.8;
+        filter: drop-shadow(0 0 25px var(--theme-gold));
+    }
+}
+
+/* ============================================
+   Player Nodes
+   ============================================ */
+
+.player-node {
+    position: absolute;
+    width: 230px;
+    padding: 12px 15px;
+    background: linear-gradient(135deg,
+        rgba(255, 255, 255, 0.08) 0%,
+        rgba(255, 255, 255, 0.03) 100%);
+    border: 2px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
+}
+
+.player-node:hover {
+    transform: scale(1.02);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Player States */
+.player-node.active {
+    background: linear-gradient(135deg,
+        var(--player-active) 0%,
+        rgba(255, 255, 255, 0.03) 100%);
+    border-color: var(--player-active-border);
+    box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+}
+
+.player-node.eliminated {
+    background: linear-gradient(135deg,
+        var(--player-eliminated) 0%,
+        rgba(255, 255, 255, 0.02) 100%);
+    border-color: var(--player-eliminated-border);
+    opacity: 0.6;
+}
+
+.player-node.eliminated .player-name {
+    text-decoration: line-through;
+    color: var(--text-secondary);
+}
+
+.player-node.advancing {
+    background: linear-gradient(135deg,
+        var(--player-advancing) 0%,
+        rgba(255, 255, 255, 0.05) 100%);
+    border-color: var(--player-advancing-border);
+    box-shadow: 0 0 25px rgba(0, 255, 136, 0.3);
+    animation: advancingPulse 2s ease-in-out infinite;
+}
+
+@keyframes advancingPulse {
+    0%, 100% { box-shadow: 0 0 25px rgba(0, 255, 136, 0.3); }
+    50% { box-shadow: 0 0 35px rgba(0, 255, 136, 0.5); }
+}
+
+/* Player Node Content */
+.player-rank {
+    position: absolute;
+    top: -10px;
+    left: 15px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--bg-dark);
+    background: var(--theme-cyan);
+    padding: 2px 10px;
+    border-radius: 10px;
+    text-shadow: none;
+}
+
+.player-node.rank-1 .player-rank {
+    background: var(--theme-gold);
+    color: var(--bg-dark);
+}
+
+.player-node.rank-2 .player-rank {
+    background: #c0c0c0;
+    color: var(--bg-dark);
+}
+
+.player-node.rank-3 .player-rank {
+    background: #cd7f32;
+    color: var(--bg-dark);
+}
+
+.player-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    letter-spacing: 1px;
+    margin-top: 5px;
+}
+
+.player-score {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--theme-cyan);
+    text-align: center;
+    text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+}
+
+.player-points {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--theme-pink);
+    text-align: center;
+    background: rgba(255, 107, 157, 0.1);
+    padding: 2px 10px;
+    border-radius: 10px;
+    align-self: center;
+}
+
+/* ============================================
+   Quarterfinals Positioning (Outer Ring)
+   ============================================ */
+
+/* Group A - Left Top */
+.quarterfinal#A1 { left: 50px; top: 100px; }
+.quarterfinal#A2 { left: 50px; top: 220px; }
+.quarterfinal#A3 { left: 50px; top: 340px; }
+.quarterfinal#A4 { left: 50px; top: 460px; }
+
+/* Group B - Left Bottom */
+.quarterfinal#B1 { left: 50px; top: 580px; }
+.quarterfinal#B2 { left: 50px; top: 700px; }
+.quarterfinal#B3 { left: 50px; top: 820px; }
+.quarterfinal#B4 { left: 50px; top: 940px; }
+
+/* Group C - Right Top */
+.quarterfinal#C1 { right: 50px; top: 100px; }
+.quarterfinal#C2 { right: 50px; top: 220px; }
+.quarterfinal#C3 { right: 50px; top: 340px; }
+.quarterfinal#C4 { right: 50px; top: 460px; }
+
+/* Group D - Right Bottom */
+.quarterfinal#D1 { right: 50px; top: 580px; }
+.quarterfinal#D2 { right: 50px; top: 700px; }
+.quarterfinal#D3 { right: 50px; top: 820px; }
+.quarterfinal#D4 { right: 50px; top: 940px; }
+
+/* ============================================
+   Semifinals Positioning (Middle Ring)
+   ============================================ */
+
+/* Group AB - Left Side */
+.semifinal#AB1 { left: 450px; top: 160px; }
+.semifinal#AB2 { left: 450px; top: 300px; }
+.semifinal#AB3 { left: 450px; top: 540px; }
+.semifinal#AB4 { left: 450px; top: 680px; }
+
+/* Group CD - Right Side */
+.semifinal#CD1 { right: 450px; top: 160px; }
+.semifinal#CD2 { right: 450px; top: 300px; }
+.semifinal#CD3 { right: 450px; top: 540px; }
+.semifinal#CD4 { right: 450px; top: 680px; }
+
+/* ============================================
+   Finals Positioning (Inner Ring)
+   ============================================ */
+
+.final#F1 { left: 830px; top: 300px; }
+.final#F2 { left: 830px; top: 440px; }
+.final#F3 { left: 1050px; top: 300px; }
+.final#F4 { left: 1050px; top: 440px; }
+
+/* ============================================
+   Group Labels
+   ============================================ */
+
+.group-label {
+    position: absolute;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 3px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 15px;
+    border-radius: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 5;
+}
+
+.group-a-label { left: 95px; top: 70px; color: var(--theme-cyan); }
+.group-b-label { left: 95px; top: 550px; color: var(--theme-cyan); }
+.group-c-label { right: 95px; top: 70px; color: var(--theme-pink); }
+.group-d-label { right: 95px; top: 550px; color: var(--theme-pink); }
+.group-ab-label { left: 495px; top: 130px; color: var(--theme-purple); }
+.group-cd-label { right: 495px; top: 130px; color: var(--theme-purple); }
+.finals-label {
+    left: 50%;
+    top: 260px;
+    transform: translateX(-50%);
+    color: var(--theme-gold);
+    border-color: var(--theme-gold);
+}
+
+/* ============================================
+   Champion Trophy
+   ============================================ */
+
+.champion-trophy {
+    position: absolute;
+    left: 50%;
+    top: 540px;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    background: radial-gradient(ellipse, rgba(255, 215, 0, 0.15) 0%, transparent 70%);
+    border-radius: 50%;
+}
+
+.trophy-icon {
+    font-size: 64px;
+    filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
+    animation: trophyFloat 3s ease-in-out infinite;
+}
+
+@keyframes trophyFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+
+.champion-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 900;
+    color: var(--theme-gold);
+    letter-spacing: 4px;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+    margin-top: 10px;
+}
+
+.champion-name {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-align: center;
+    margin-top: 5px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.champion-trophy.has-champion {
+    background: radial-gradient(ellipse, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+    animation: championAura 2s ease-in-out infinite;
+}
+
+@keyframes championAura {
+    0%, 100% {
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+    }
+}
+
+/* ============================================
+   Connection Status
+   ============================================ */
+
+.connection-status {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 100;
+}
+
+.status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #ff4444;
+    box-shadow: 0 0 8px #ff4444;
+    transition: all 0.3s ease;
+}
+
+.status-dot.connected {
+    background: #00ff88;
+    box-shadow: 0 0 8px #00ff88;
+}
+
+.status-dot.connecting {
+    background: #ffaa00;
+    box-shadow: 0 0 8px #ffaa00;
+    animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.status-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+
+@keyframes scoreUpdate {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.1); text-shadow: 0 0 20px currentColor; }
+    60% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+}
+
+.score-updating {
+    animation: scoreUpdate 0.5s ease-out;
+}
+
+/* Responsive for OBS */
+@media screen and (max-width: 1920px) {
+    html, body {
+        transform-origin: top left;
+    }
+}
