@@ -634,13 +634,8 @@ class TournamentApp {
      * @param {boolean} isChampion - Whether this is the champion path
      */
     lightPath(from, to, isChampion = false) {
-        const path = this.getPath(from, to);
-        if (!path) return;
-
-        path.classList.add('lit');
-        if (isChampion) {
-            path.classList.add('champion-path');
-        }
+        // No-op: user doesn't want connection lines
+        return;
     }
 
     // ==========================================
@@ -666,10 +661,8 @@ class TournamentApp {
      * Clear all path lighting
      */
     clearAllPaths() {
-        const litPaths = document.querySelectorAll('[data-path].lit');
-        litPaths.forEach(path => {
-            path.classList.remove('lit', 'champion-path');
-        });
+        // No-op: user doesn't want connection lines
+        return;
     }
 
     /**

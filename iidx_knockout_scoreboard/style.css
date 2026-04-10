@@ -205,16 +205,16 @@ html, body {
 
 .player-node {
     position: absolute;
-    width: 230px;
-    padding: 12px 15px;
+    width: 160px;
+    padding: 10px 12px;
     background: linear-gradient(135deg,
         rgba(255, 255, 255, 0.08) 0%,
         rgba(255, 255, 255, 0.03) 100%);
     border: 2px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
+    border-radius: 10px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     z-index: 10;
     transition: all 0.3s ease;
     backdrop-filter: blur(4px);
@@ -303,20 +303,21 @@ html, body {
 
 .player-score {
     font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-align: center;
+    opacity: 0.8;
+}
+
+.player-points {
+    font-family: 'Rajdhani', sans-serif;
     font-size: 18px;
     font-weight: 700;
     color: var(--theme-cyan);
     text-align: center;
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
-}
-
-.player-points {
-    font-family: 'Rajdhani', sans-serif;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--theme-pink);
-    text-align: center;
-    background: rgba(255, 107, 157, 0.1);
+    background: rgba(0, 255, 255, 0.1);
     padding: 2px 10px;
     border-radius: 10px;
     align-self: center;
@@ -393,10 +394,10 @@ html, body {
     z-index: 5;
 }
 
-.group-a-label { left: 95px; top: 70px; color: var(--theme-cyan); }
-.group-b-label { left: 95px; top: 550px; color: var(--theme-cyan); }
-.group-c-label { right: 95px; top: 70px; color: var(--theme-pink); }
-.group-d-label { right: 95px; top: 550px; color: var(--theme-pink); }
+.group-a-label { left: 60px; top: 70px; color: var(--theme-cyan); }
+.group-b-label { left: 60px; top: 550px; color: var(--theme-cyan); }
+.group-c-label { right: 60px; top: 70px; color: var(--theme-pink); }
+.group-d-label { right: 60px; top: 550px; color: var(--theme-pink); }
 .group-ab-label { left: 495px; top: 130px; color: var(--theme-purple); }
 .group-cd-label { right: 495px; top: 130px; color: var(--theme-purple); }
 .finals-label {
