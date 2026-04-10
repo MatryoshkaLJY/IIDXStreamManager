@@ -81,6 +81,13 @@ class MachineStatus:
     score_count: int = 0
     is_active: bool = False
     error_message: str = ""
+    # 分数验证状态
+    score_validation_pending: bool = False
+    last_score_valid: Optional[bool] = None
+    p1_valid: Optional[bool] = None
+    p2_valid: Optional[bool] = None
+    p1_expected: Optional[str] = None
+    p2_expected: Optional[str] = None
 
 
 # ============== 全局状态 ==============
@@ -222,11 +229,39 @@ def monitor_loop():
                         if scores:
                             status.last_scores = scores
                             status.score_count += 1
+
+                            # 更新分数验证状态
+                            status.score_validation_pending = result.get("score_validation_pending", False)
+                            status.p1_valid = scores.get("1p_valid")
+                            status.p2_valid = scores.get("2p_valid")
+                            status.p1_expected = scores.get("1p_expected")
+                            status.p2_expected = scores.get("2p_expected")
+
+                            # 判断整体验证状态
+                            if status.p1_valid is True or status.p2_valid is True:
+                                status.last_score_valid = True
+                            elif status.p1_valid is False and status.p2_valid is False:
+                                status.last_score_valid = False
+                            else:
+                                status.last_score_valid = None
+
                             add_score_record(machine_id, scores, state_result)
+
+                            # 构建带验证状态的日志消息
+                            validation_msg = ""
+                            if status.p1_valid is not None or status.p2_valid is not None:
+                                p1_status = "✓" if status.p1_valid is True else "✗" if status.p1_valid is False else "?"
+                                p2_status = "✓" if status.p2_valid is True else "✗" if status.p2_valid is False else "?"
+                                validation_msg = f" [1P:{p1_status} 2P:{p2_status}]"
+
                             add_log(
                                 "score",
-                                f"[{machine_id}] 识别到分数",
-                                {"scores": scores, "state": state_result}
+                                f"[{machine_id}] 识别到分数{validation_msg}",
+                                {"scores": scores, "state": state_result, "validation": {
+                                    "p1_valid": status.p1_valid,
+                                    "p2_valid": status.p2_valid,
+                                    "pending": status.score_validation_pending
+                                }}
                             )
 
                         # 记录状态转换

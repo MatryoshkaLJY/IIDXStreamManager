@@ -77,6 +77,52 @@ def load_rois_from_csv(csv_path: str) -> List[Tuple[str, int, int, int, int]]:
     return rois
 
 
+def validate_score_result(results: dict) -> dict:
+    """
+    验证1P和2P的分数是否符合公式：
+    - 1pscore = 2 * 1ppg + 1pgr
+    - 2pscore = 2 * 2ppg + 2pgr
+
+    返回包含验证状态的额外字段
+    """
+    validated = dict(results)
+
+    def parse_int(value):
+        """解析整数字符串，处理空值或无效值"""
+        if not value or value == "":
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    # 验证1P
+    p1_score = parse_int(results.get("1pscore"))
+    p1_pg = parse_int(results.get("1ppg"))
+    p1_gr = parse_int(results.get("1pgr"))
+
+    if p1_score is not None and p1_pg is not None and p1_gr is not None:
+        expected = 2 * p1_pg + p1_gr
+        validated["1p_valid"] = (p1_score == expected)
+        validated["1p_expected"] = str(expected)
+    else:
+        validated["1p_valid"] = None  # 缺少字段无法验证
+
+    # 验证2P
+    p2_score = parse_int(results.get("2pscore"))
+    p2_pg = parse_int(results.get("2ppg"))
+    p2_gr = parse_int(results.get("2pgr"))
+
+    if p2_score is not None and p2_pg is not None and p2_gr is not None:
+        expected = 2 * p2_pg + p2_gr
+        validated["2p_valid"] = (p2_score == expected)
+        validated["2p_expected"] = str(expected)
+    else:
+        validated["2p_valid"] = None  # 缺少字段无法验证
+
+    return validated
+
+
 def recv_exact(conn: socket.socket, n: int) -> bytes:
     """精确接收 n 字节数据"""
     buf = bytearray()
@@ -135,8 +181,11 @@ def handle_client(
                 # 清理临时文件
                 Path(tmp_path).unlink(missing_ok=True)
 
+            # 验证1P和2P分数的合法性
+            validated_results = validate_score_result(results)
+
             # 发送 JSON 结果
-            response = json.dumps(results) + "\n"
+            response = json.dumps(validated_results) + "\n"
             conn.sendall(response.encode())
 
     except (ConnectionError, ConnectionResetError):

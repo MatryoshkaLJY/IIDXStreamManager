@@ -59,6 +59,9 @@ class MachineConfig:
     source_name: str
     state_infer_addr: Union[str, Tuple[str, int]] = ("127.0.0.1", 9876)
     score_infer_addr: Tuple[str, int] = ("127.0.0.1", 9877)
+    # Score validation retry state
+    pending_score_validation: bool = False
+    last_invalid_scores: Optional[dict] = None
 
 
 class OBSManager:
@@ -497,6 +500,7 @@ class OBSManager:
         1. 抓取图像并进行状态识别
         2. 将识别结果输入状态机
         3. 若状态机触发 get_score，则抓取分数
+        4. 验证分数合法性，不合法且在 score 状态时重试
 
         Args:
             machine_id: 机器唯一标识
@@ -521,12 +525,38 @@ class OBSManager:
         # 2. 状态机处理
         state_result = self._state_manager.process_event(machine_id, label)
 
-        # 3. 分数识别（仅在进入 SCORE 状态时触发）
+        # 3. 分数识别（仅在进入 SCORE 状态时触发，或需要重试时）
         scores = None
-        if state_result and "get_score" in state_result.get("actions_triggered", []):
+        need_score_capture = (
+            state_result and "get_score" in state_result.get("actions_triggered", [])
+        ) or (
+            cfg.pending_score_validation and label == "score"
+        )
+
+        if need_score_capture:
             scores = self.capture_and_recognize_score(
                 cfg.source_name, cfg.score_infer_addr
             )
+
+            # 4. 验证分数合法性
+            if scores:
+                p1_valid = scores.get("1p_valid")
+                p2_valid = scores.get("2p_valid")
+
+                # 如果其中有一个为 true，表明识别正常
+                if p1_valid is True or p2_valid is True:
+                    cfg.pending_score_validation = False
+                    cfg.last_invalid_scores = None
+                else:
+                    # 识别不正常，标记需要重试
+                    cfg.pending_score_validation = True
+                    cfg.last_invalid_scores = scores
+
+                    # 如果当前已经不是 score 状态，放弃重试
+                    if label != "score":
+                        cfg.pending_score_validation = False
+                        # 返回最后一次无效的分数（带有验证标记）
+                        scores = cfg.last_invalid_scores
 
         return {
             "machine_id": machine_id,
@@ -534,6 +564,7 @@ class OBSManager:
             "label": label,
             "state": state_result,
             "scores": scores,
+            "score_validation_pending": cfg.pending_score_validation,
         }
 
     def run(self, interval: float = 1.0) -> None:
