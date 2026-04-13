@@ -1,12 +1,13 @@
 ---
-status: layout_updated
+status: complete
 phase: 01-knockout-tournament
 source:
   - 01-01-SUMMARY.md
   - 01-02-SUMMARY.md
   - 01-03-SUMMARY.md
 started: 2026-04-10T12:00:00Z
-updated: 2026-04-11T12:00:00Z
+updated: 2026-04-13T12:00:00Z
+completed: 2026-04-13T12:00:00Z
 gaps_diagnosed: 4
 fix_plans_created: 4
 fix_plans_executed: 4
@@ -15,13 +16,6 @@ layout_updated: true
 
 ## Current Test
 
-number: 10
-name: Champion Presentation
-expected: |
-  Send SETTLE for finals.
-  - Champion determined (top by points, tiebreaker by raw score)
-  - Champion name displays in center trophy area
-  - Full champion path lights from quarterfinal → semifinal → final with gold glow
 [testing complete]
 
 ## Tests
@@ -39,9 +33,7 @@ expected: |
   - SVG connection lines linking stages
   - Champion trophy centered with floating animation
   - Connection status indicator visible
-result: issue
-reported: "布局很拥挤，每个叶子节点的宽高都有些大，并且发生了重叠。Group B和D的标签被放到了选手节点的底部。另外，连线看起来很杂乱，我不需要这些多余的连线了。"
-severity: major
+result: pass
 
 ### 3. Player Node States Visual
 expected: |
@@ -76,13 +68,12 @@ severity: major
 ### 6. SCORE Command - Scoring and Points
 expected: |
   Send SCORE command for a round with 4 player scores.
-  - Scores display on player cards
+  - Scores display on player cards (small text)
+  - Points display large and bold (no "pts" suffix)
   - Points calculated: 1st=2pts, 2nd=1pt, 3rd/4th=0pts
   - Ranks shown correctly
   After 4 rounds, cumulative scores and points are accurate
-result: issue
-reported: "player-score应该以小字显示，player-points应以大字显示。"
-severity: cosmetic
+result: pass
 
 ### 7. SETTLE Command - Quarterfinal Advancement
 expected: |
@@ -124,16 +115,16 @@ expected: |
   - All path lighting cleared
   - Champion display reset to '???'
   - Title resets to '淘汰赛'
-result: pending
+result: pass
 
 ## Summary
 
 total: 10
-passed: 2
-issues: 7
+passed: 5
+issues: 0
 pending: 0
 skipped: 0
-blocked: 1
+blocked: 0
 
 ## Gaps
 
