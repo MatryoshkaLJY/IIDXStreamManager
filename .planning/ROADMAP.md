@@ -30,7 +30,7 @@ See archive: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
 ### v1.1 Tournament Rule Refinements (In Progress)
 
-- [ ] Phase 2: Tournament Rule Refinements (0/1 plans) — started 2026-04-13
+- [ ] Phase 2: Tournament Rule Refinements (0/2 plans) — started 2026-04-13
 
 ## Phase Details
 
@@ -54,14 +54,15 @@ See archive: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   5. Sorting rules match spec for groups and finals
   6. Final stage renders medals and champion gold glow
   7. Init command preserves header structure
-**Plans**: 1 plan
-  - Plan 01: Implement all v1.1 rule refinements
+**Plans**: 2 plans
+  - Plan 01: Cleanup and Foundation Fixes (remove trophy, fix init, cumulative scoring)
+  - Plan 02: Group Restructure, Progression, and Finals Visuals (E/F groups, active highlighting, sorting, medals)
 
 ## Progress
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1. Knockout Scoreboard | v1.0 | 7/7 | Complete | 2026-04-13 |
-| 2. Rule Refinements | v1.1 | 0/1 | In Progress | - |
+| 2. Rule Refinements | v1.1 | 0/2 | In Progress | - |
 
 ---
