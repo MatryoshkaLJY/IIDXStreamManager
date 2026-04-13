@@ -45,6 +45,36 @@ Reliable, visually polished tournament scoreboards that integrate cleanly into s
 | Python websockets for relay server | Simple, lightweight broadcast server | Good |
 | Horizontal player node layout (late change) | Better fit at 1920x1080, clearer score/points emphasis | Good |
 
+## Current Milestone: v1.1 Tournament Rule Refinements
+
+**Goal:** Refine the knockout tournament scoreboard with improved scoring, group progression, and visual feedback rules.
+
+**Target features:**
+- Remove champion trophy UI and related code
+- Cumulative raw score tracking per round instead of overwriting
+- Restructure semifinals: E group (A1+B2+C2+D1) and F group (A2+B1+C1+D2), with A→B→C→D→E→F→Final order
+- Highlight only the active group during initialization and auto-advance after settlement
+- Updated sorting: ABCDEF groups by PT then cumulative score; Final by PT only with tiebreaker extra round (score-only)
+- Distinct final-stage visuals: champion gold glow, points replaced with 🥇🥈🥉 medals
+- Fix init command to preserve stage-indicator and title-text elements
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd-transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd-complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
+
 ---
 
 *Last updated: 2026-04-13 after v1.0 milestone*
