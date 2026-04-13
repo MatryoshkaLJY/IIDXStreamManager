@@ -2,10 +2,10 @@
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-04-13 — Milestone v1.1 started
+Phase: 2
+Plan: 01
+Status: Ready to discuss
+Last activity: 2026-04-13 — Roadmap defined for v1.1
 
 ## Project Reference
 
