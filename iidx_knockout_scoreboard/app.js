@@ -62,11 +62,12 @@ class TournamentApp {
                 B: { players: [], scores: [], settled: false, advancing: [] },
                 C: { players: [], scores: [], settled: false, advancing: [] },
                 D: { players: [], scores: [], settled: false, advancing: [] },
-                AB: { players: [], scores: [], settled: false, advancing: [] },
-                CD: { players: [], scores: [], settled: false, advancing: [] }
+                E: { players: [], scores: [], settled: false, advancing: [] },
+                F: { players: [], scores: [], settled: false, advancing: [] }
             },
-            finals: { players: [], scores: [], settled: false, champion: null },
-            currentStage: 'quarterfinal'
+            finals: { players: [], scores: [], settled: false, inTiebreaker: false },
+            currentStage: 'quarterfinal',
+            currentActiveGroup: null
         };
 
         // DOM element cache
@@ -186,15 +187,18 @@ class TournamentApp {
 
         console.log('🏆 Initializing tournament:', data.tournamentName);
 
+        // Reset state first
+        this.handleReset();
+
         // Update tournament name
         if (data.tournamentName) {
             this.tournamentState.tournamentName = data.tournamentName;
             const titleEl = document.querySelector('.tournament-title');
-            if (titleEl) titleEl.textContent = data.tournamentName;
+            if (titleEl) {
+                const titleTextEl = titleEl.querySelector('.title-text');
+                if (titleTextEl) titleTextEl.textContent = data.tournamentName;
+            }
         }
-
-        // Reset state first
-        this.handleReset();
 
         // Initialize quarterfinal groups with player objects
         const quarterfinalGroups = ['A', 'B', 'C', 'D'];
@@ -218,25 +222,24 @@ class TournamentApp {
                         points: 0,
                         rank: '-'
                     });
-                    this.setPlayerState(groupName, position, 'active');
                 });
             }
         }
 
-        // Initialize empty semifinal groups (AB, CD)
-        this.tournamentState.groups.AB.players = [];
-        this.tournamentState.groups.CD.players = [];
+        // Initialize empty semifinal groups (E, F)
+        this.tournamentState.groups.E.players = [];
+        this.tournamentState.groups.F.players = [];
 
         // Initialize empty finals
         this.tournamentState.finals.players = [];
+        this.tournamentState.finals.inTiebreaker = false;
 
         // Clear any existing path lighting
         this.clearAllPaths();
 
-        // Reset champion display
-        this.clearChampionDisplay();
-
         this.tournamentState.currentStage = 'quarterfinal';
+        this.tournamentState.currentActiveGroup = 'A';
+        this.highlightGroup('A');
         console.log('Tournament initialized:', this.tournamentState);
     }
 
@@ -302,15 +305,31 @@ class TournamentApp {
                 // Store raw score for this round (round is 1-indexed, array is 0-indexed)
                 player.rawScores[round - 1] = rawScore;
 
-                // Calculate total raw score
-                player.totalRawScore = player.rawScores.reduce((sum, s) => sum + (s || 0), 0);
-
-                // Add points for this round
-                player.points += points;
+                let displayScore;
+                if (stage === 'final') {
+                    const finalsState = this.tournamentState.finals;
+                    if (finalsState.inTiebreaker) {
+                        // Tiebreaker: accumulate tiebreaker score, no points awarded
+                        player.tiebreakerScore = (player.tiebreakerScore || 0) + rawScore;
+                        displayScore = player.tiebreakerScore;
+                    } else {
+                        // Finals normal round: display current round score only, do not accumulate totalRawScore
+                        player.totalRawScore = 0;
+                        displayScore = rawScore;
+                        // Add points for this round
+                        player.points += points;
+                    }
+                } else {
+                    // A-F groups: accumulate total raw score
+                    player.totalRawScore = player.rawScores.reduce((sum, s) => sum + (s || 0), 0);
+                    // Add points for this round
+                    player.points += points;
+                    displayScore = player.totalRawScore;
+                }
 
                 // Update DOM
                 this.updatePlayerNode(group, player.position, {
-                    score: rawScore,
+                    score: displayScore,
                     points: player.points,
                     rank: rank
                 });
@@ -350,147 +369,170 @@ class TournamentApp {
 
         groupState.settled = true;
 
-        // Sort players by points (desc), then totalRawScore (desc) for tiebreaker
-        const sortedPlayers = [...groupState.players].sort((a, b) => {
-            if (b.points !== a.points) {
-                return b.points - a.points; // Higher points first
+        // Sort players based on stage rules
+        let sortedPlayers;
+        if (stage === 'final') {
+            if (groupState.inTiebreaker) {
+                sortedPlayers = [...groupState.players].sort((a, b) => {
+                    return (b.tiebreakerScore || 0) - (a.tiebreakerScore || 0);
+                });
+            } else {
+                sortedPlayers = [...groupState.players].sort((a, b) => {
+                    return b.points - a.points;
+                });
             }
-            return b.totalRawScore - a.totalRawScore; // Higher raw score as tiebreaker
-        });
-
-        // Top 2 advance, bottom 2 eliminated
-        const advancing = sortedPlayers.slice(0, 2);
-        const eliminated = sortedPlayers.slice(2);
-
-        // Mark eliminated players
-        for (const player of eliminated) {
-            this.setPlayerState(group, player.position, 'eliminated');
+        } else {
+            // A-F groups: sort by PT then totalRawScore
+            sortedPlayers = [...groupState.players].sort((a, b) => {
+                if (b.points !== a.points) {
+                    return b.points - a.points; // Higher points first
+                }
+                return b.totalRawScore - a.totalRawScore; // Higher raw score as tiebreaker
+            });
         }
 
-        // Mark advancing players and light paths
-        for (const player of advancing) {
-            this.setPlayerState(group, player.position, 'advancing');
-        }
+        if (stage !== 'final') {
+            // Top 2 advance, bottom 2 eliminated
+            const advancing = sortedPlayers.slice(0, 2);
+            const eliminated = sortedPlayers.slice(2);
 
-        // Store advancing players in group state
-        groupState.advancing = advancing.map(p => ({ ...p }));
-
-        // Handle advancement to next stage
-        if (stage === 'quarterfinal') {
-            // Quarterfinal to semifinal advancement
-            let targetGroup;
-            let positionOffset = 0;
-
-            if (group === 'A') {
-                targetGroup = 'AB';
-                positionOffset = 0;
-            } else if (group === 'B') {
-                targetGroup = 'AB';
-                positionOffset = 2;
-            } else if (group === 'C') {
-                targetGroup = 'CD';
-                positionOffset = 0;
-            } else if (group === 'D') {
-                targetGroup = 'CD';
-                positionOffset = 2;
+            // Mark eliminated players
+            for (const player of eliminated) {
+                this.setPlayerState(group, player.position, 'eliminated');
             }
 
-            if (targetGroup) {
-                const targetState = this.tournamentState.groups[targetGroup];
+            // Mark advancing players
+            for (const player of advancing) {
+                this.setPlayerState(group, player.position, 'advancing');
+            }
 
-                // Light paths from quarterfinal to semifinal
+            // Store advancing players in group state
+            groupState.advancing = advancing.map(p => ({ ...p }));
+
+            // Handle advancement to next stage
+            if (stage === 'quarterfinal') {
+                const first = sortedPlayers[0];
+                const second = sortedPlayers[1];
+
+                if (group === 'A') {
+                    this.advancePlayerToGroup(first, group, 'E', 0);
+                    this.advancePlayerToGroup(second, group, 'F', 0);
+                } else if (group === 'B') {
+                    this.advancePlayerToGroup(second, group, 'E', 1);
+                    this.advancePlayerToGroup(first, group, 'F', 1);
+                } else if (group === 'C') {
+                    this.advancePlayerToGroup(second, group, 'E', 2);
+                    this.advancePlayerToGroup(first, group, 'F', 2);
+                } else if (group === 'D') {
+                    this.advancePlayerToGroup(first, group, 'E', 3);
+                    this.advancePlayerToGroup(second, group, 'F', 3);
+                }
+            } else if (stage === 'semifinal') {
+                let positionOffset = 0;
+                if (group === 'E') {
+                    positionOffset = 0;
+                } else if (group === 'F') {
+                    positionOffset = 2;
+                }
+
+                const finalsState = this.tournamentState.finals;
                 for (let i = 0; i < advancing.length; i++) {
                     const player = advancing[i];
                     const targetPosition = positionOffset + i;
-                    const fromId = `${group}-${player.position}`;
-                    const toId = `${targetGroup}-${targetPosition}`;
 
-                    this.lightPath(fromId, toId);
+                    this.lightPath(`${group}-${player.position}`, `finals-${targetPosition}`);
 
-                    // Copy player data to next stage
                     const advancedPlayer = {
                         name: player.name,
                         position: targetPosition,
                         rawScores: [null, null, null, null],
                         points: 0,
-                        totalRawScore: 0
+                        totalRawScore: 0,
+                        tiebreakerScore: 0
                     };
 
-                    // Add to target group players array
-                    if (!targetState.players[targetPosition]) {
-                        targetState.players[targetPosition] = advancedPlayer;
+                    if (!finalsState.players[targetPosition]) {
+                        finalsState.players[targetPosition] = advancedPlayer;
                     }
 
-                    // Update DOM for next stage node
-                    this.updatePlayerNode(targetGroup, targetPosition, {
+                    this.updatePlayerNode('finals', targetPosition, {
                         name: player.name,
                         score: 0,
                         points: 0,
                         rank: '-'
                     });
-                    this.setPlayerState(targetGroup, targetPosition, 'active');
                 }
             }
-        } else if (stage === 'semifinal') {
-            // Semifinal to final advancement
-            let positionOffset = 0;
 
-            if (group === 'AB') {
-                positionOffset = 0;
-            } else if (group === 'CD') {
-                positionOffset = 2;
+            // Advance active group highlight
+            const groupOrder = ['A', 'B', 'C', 'D', 'E', 'F', 'finals'];
+            const currentIndex = groupOrder.indexOf(group);
+            if (currentIndex !== -1 && currentIndex < groupOrder.length - 1) {
+                const nextGroup = groupOrder[currentIndex + 1];
+                this.tournamentState.currentActiveGroup = nextGroup;
+                this.highlightGroup(nextGroup);
             }
-
-            const finalsState = this.tournamentState.finals;
-
-            // Light paths from semifinal to final
-            for (let i = 0; i < advancing.length; i++) {
-                const player = advancing[i];
-                const targetPosition = positionOffset + i;
-                const fromId = `${group}-${player.position}`;
-                const toId = `finals-${targetPosition}`;
-
-                this.lightPath(fromId, toId);
-
-                // Copy player data to finals
-                const advancedPlayer = {
-                    name: player.name,
-                    position: targetPosition,
-                    rawScores: [null, null, null, null],
-                    points: 0,
-                    totalRawScore: 0
-                };
-
-                // Add to finals players array
-                if (!finalsState.players[targetPosition]) {
-                    finalsState.players[targetPosition] = advancedPlayer;
-                }
-
-                // Update DOM for finals node
-                this.updatePlayerNode('finals', targetPosition, {
-                    name: player.name,
-                    score: 0,
-                    points: 0,
-                    rank: '-'
+        } else {
+            // stage === 'final'
+            if (!groupState.inTiebreaker) {
+                // Check for PT ties
+                const hasTie = sortedPlayers.some((p, i) => {
+                    if (i === 0) return false;
+                    return p.points === sortedPlayers[i - 1].points;
                 });
-                this.setPlayerState('finals', targetPosition, 'active');
-            }
-        } else if (stage === 'final') {
-            // Determine champion
-            const champion = sortedPlayers[0];
-            if (champion) {
-                this.tournamentState.finals.champion = champion;
 
-                // Update champion display
-                const championEl = document.querySelector('.champion-name');
-                if (championEl) {
-                    championEl.textContent = champion.name;
+                if (hasTie) {
+                    groupState.inTiebreaker = true;
+                    for (const player of groupState.players) {
+                        this.setPlayerState('finals', player.position, 'active');
+                    }
+                    console.log('🏁 Finals tied! Entering tiebreaker.');
+                    return;
                 }
+            }
 
-                // Light champion path
-                this.lightChampionPath(champion);
+            // Assign medals
+            const medals = ['🥇', '🥈', '🥉', ''];
+            for (let i = 0; i < sortedPlayers.length; i++) {
+                const player = sortedPlayers[i];
+                const node = this.getPlayerNode('finals', player.position);
+                if (node) {
+                    node.classList.remove('active', 'eliminated', 'advancing');
+                    if (i === 0) {
+                        node.classList.add('champion');
+                    }
+                    const pointsEl = node.querySelector('.player-points');
+                    if (pointsEl) pointsEl.textContent = medals[i] || '';
+                }
             }
         }
+    }
+
+    /**
+     * Helper to advance a player to a target group
+     */
+    advancePlayerToGroup(player, fromGroup, targetGroup, targetPosition) {
+        this.lightPath(`${fromGroup}-${player.position}`, `${targetGroup}-${targetPosition}`);
+
+        const advancedPlayer = {
+            name: player.name,
+            position: targetPosition,
+            rawScores: [null, null, null, null],
+            points: 0,
+            totalRawScore: 0
+        };
+
+        const targetState = this.tournamentState.groups[targetGroup];
+        if (!targetState.players[targetPosition]) {
+            targetState.players[targetPosition] = advancedPlayer;
+        }
+
+        this.updatePlayerNode(targetGroup, targetPosition, {
+            name: player.name,
+            score: 0,
+            points: 0,
+            rank: '-'
+        });
     }
 
     /**
@@ -507,15 +549,16 @@ class TournamentApp {
                 B: { players: [], scores: [], settled: false, advancing: [] },
                 C: { players: [], scores: [], settled: false, advancing: [] },
                 D: { players: [], scores: [], settled: false, advancing: [] },
-                AB: { players: [], scores: [], settled: false, advancing: [] },
-                CD: { players: [], scores: [], settled: false, advancing: [] }
+                E: { players: [], scores: [], settled: false, advancing: [] },
+                F: { players: [], scores: [], settled: false, advancing: [] }
             },
-            finals: { players: [], scores: [], settled: false, champion: null },
-            currentStage: 'quarterfinal'
+            finals: { players: [], scores: [], settled: false, inTiebreaker: false },
+            currentStage: 'quarterfinal',
+            currentActiveGroup: null
         };
 
         // Clear all player nodes (reset to 'TBD', 0, '-')
-        const allGroups = ['A', 'B', 'C', 'D', 'AB', 'CD'];
+        const allGroups = ['A', 'B', 'C', 'D', 'E', 'F'];
         for (const group of allGroups) {
             for (let position = 0; position < 4; position++) {
                 this.updatePlayerNode(group, position, {
@@ -542,12 +585,12 @@ class TournamentApp {
         // Clear all path lighting
         this.clearAllPaths();
 
-        // Clear champion display
-        this.clearChampionDisplay();
-
         // Reset tournament name
         const titleEl = document.querySelector('.tournament-title');
-        if (titleEl) titleEl.textContent = '淘汰赛';
+        if (titleEl) {
+            const titleTextEl = titleEl.querySelector('.title-text');
+            if (titleTextEl) titleTextEl.textContent = '淘汰赛';
+        }
     }
 
     // ==========================================
@@ -556,7 +599,7 @@ class TournamentApp {
 
     /**
      * Get player node element by group and position
-     * @param {string} group - Group name (A, B, C, D, AB, CD, finals)
+     * @param {string} group - Group name (A, B, C, D, E, F, finals)
      * @param {number} position - Player position (0-3)
      * @returns {Element|null} Player node element
      */
@@ -567,7 +610,7 @@ class TournamentApp {
     /**
      * Get SVG path element connecting two nodes
      * @param {string} from - Source node identifier (e.g., "A-0")
-     * @param {string} to - Target node identifier (e.g., "AB-0")
+     * @param {string} to - Target node identifier (e.g., "E-0")
      * @returns {Element|null} SVG path element
      */
     getPath(from, to) {
@@ -666,79 +709,28 @@ class TournamentApp {
     }
 
     /**
-     * Clear champion display
+     * Highlight a group as active, clearing active from all other groups
+     * @param {string} groupName - Group name to highlight
      */
-    clearChampionDisplay() {
-        const championEl = document.querySelector('.champion-name');
-        if (championEl) {
-            championEl.textContent = '???';
-        }
-    }
-
-    /**
-     * Light up the full champion progression path
-     * @param {Object} champion - Champion player object
-     */
-    lightChampionPath(champion) {
-        // Find which quarterfinal group the champion came from
-        let quarterfinalGroup = null;
-        let quarterfinalPosition = null;
-        let semifinalGroup = null;
-        let semifinalPosition = null;
-        let finalPosition = null;
-
-        // Search through finals to find champion position
-        for (let i = 0; i < this.tournamentState.finals.players.length; i++) {
-            const player = this.tournamentState.finals.players[i];
-            if (player && player.name === champion.name) {
-                finalPosition = i;
-                break;
+    highlightGroup(groupName) {
+        const allGroups = ['A', 'B', 'C', 'D', 'E', 'F', 'finals'];
+        for (const g of allGroups) {
+            const state = g === 'finals' ? this.tournamentState.finals : this.tournamentState.groups[g];
+            if (!state || !state.players) continue;
+            for (const player of state.players) {
+                if (player) {
+                    const node = this.getPlayerNode(g, player.position);
+                    if (node) node.classList.remove('active');
+                }
             }
         }
 
-        if (finalPosition === null) return;
-
-        // Determine which semifinal group the champion came from
-        if (finalPosition < 2) {
-            semifinalGroup = 'AB';
-            semifinalPosition = finalPosition;
-        } else {
-            semifinalGroup = 'CD';
-            semifinalPosition = finalPosition - 2;
-        }
-
-        // Find champion in semifinal group
-        const semifinalPlayers = this.tournamentState.groups[semifinalGroup].players;
-        for (let i = 0; i < semifinalPlayers.length; i++) {
-            const player = semifinalPlayers[i];
-            if (player && player.name === champion.name) {
-                // Light path from semifinal to final
-                this.lightPath(`${semifinalGroup}-${i}`, `finals-${finalPosition}`, true);
-
-                // Determine which quarterfinal group the champion came from
-                if (semifinalGroup === 'AB') {
-                    if (i < 2) {
-                        quarterfinalGroup = 'A';
-                        quarterfinalPosition = i;
-                    } else {
-                        quarterfinalGroup = 'B';
-                        quarterfinalPosition = i - 2;
-                    }
-                } else {
-                    if (i < 2) {
-                        quarterfinalGroup = 'C';
-                        quarterfinalPosition = i;
-                    } else {
-                        quarterfinalGroup = 'D';
-                        quarterfinalPosition = i - 2;
-                    }
+        const targetState = groupName === 'finals' ? this.tournamentState.finals : this.tournamentState.groups[groupName];
+        if (targetState && targetState.players) {
+            for (const player of targetState.players) {
+                if (player) {
+                    this.setPlayerState(groupName, player.position, 'active');
                 }
-
-                // Light path from quarterfinal to semifinal
-                if (quarterfinalGroup !== null) {
-                    this.lightPath(`${quarterfinalGroup}-${quarterfinalPosition}`, `${semifinalGroup}-${i}`, true);
-                }
-                break;
             }
         }
     }

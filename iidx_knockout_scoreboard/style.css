@@ -263,6 +263,26 @@ html, body {
     50% { box-shadow: 0 0 35px rgba(0, 255, 136, 0.5); }
 }
 
+.player-node.champion {
+    background: linear-gradient(135deg,
+        rgba(255, 215, 0, 0.25) 0%,
+        rgba(255, 255, 255, 0.05) 100%);
+    border-color: rgba(255, 215, 0, 0.8);
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+    animation: championGoldFlash 1.5s ease-in-out infinite;
+}
+
+@keyframes championGoldFlash {
+    0%, 100% {
+        box-shadow: 0 0 30px rgba(255, 215, 0, 0.4);
+        border-color: rgba(255, 215, 0, 0.8);
+    }
+    50% {
+        box-shadow: 0 0 50px rgba(255, 215, 0, 0.7);
+        border-color: rgba(255, 255, 100, 1);
+    }
+}
+
 /* Player Node Content - Horizontal Layout */
 .player-rank {
     position: absolute;
@@ -365,26 +385,26 @@ html, body {
    Semifinals Positioning (Middle Ring) - Compact Layout
    ============================================ */
 
-/* Group AB - Left Side */
-.semifinal#AB1 { left: 400px; top: 220px; }
-.semifinal#AB2 { left: 400px; top: 290px; }
-.semifinal#AB3 { left: 400px; top: 360px; }
-.semifinal#AB4 { left: 400px; top: 430px; }
+/* Group E - Left Side */
+.semifinal#E1 { left: 400px; top: 220px; }
+.semifinal#E2 { left: 400px; top: 290px; }
+.semifinal#E3 { left: 400px; top: 360px; }
+.semifinal#E4 { left: 400px; top: 430px; }
 
-/* Group CD - Right Side */
-.semifinal#CD1 { right: 400px; top: 220px; }
-.semifinal#CD2 { right: 400px; top: 290px; }
-.semifinal#CD3 { right: 400px; top: 360px; }
-.semifinal#CD4 { right: 400px; top: 430px; }
+/* Group F - Right Side */
+.semifinal#F1 { right: 400px; top: 220px; }
+.semifinal#F2 { right: 400px; top: 290px; }
+.semifinal#F3 { right: 400px; top: 360px; }
+.semifinal#F4 { right: 400px; top: 430px; }
 
 /* ============================================
    Finals Positioning (Inner Ring) - Compact Layout
    ============================================ */
 
-.final#F1 { left: 750px; top: 290px; }
-.final#F2 { left: 750px; top: 360px; }
-.final#F3 { right: 750px; top: 290px; }
-.final#F4 { right: 750px; top: 360px; }
+.final#FIN1 { left: 750px; top: 290px; }
+.final#FIN2 { left: 750px; top: 360px; }
+.final#FIN3 { right: 750px; top: 290px; }
+.final#FIN4 { right: 750px; top: 360px; }
 
 /* ============================================
    Group Labels
@@ -408,8 +428,8 @@ html, body {
 .group-b-label { left: 40px; top: 355px; color: var(--theme-cyan); }
 .group-c-label { right: 90px; top: 10px; color: var(--theme-pink); }
 .group-d-label { right: 90px; top: 355px; color: var(--theme-pink); }
-.group-ab-label { left: 420px; top: 175px; color: var(--theme-purple); }
-.group-cd-label { right: 440px; top: 175px; color: var(--theme-purple); }
+.group-e-label { left: 420px; top: 175px; color: var(--theme-purple); }
+.group-f-label { right: 440px; top: 175px; color: var(--theme-purple); }
 .finals-label {
     left: 50%;
     top: 240px;
