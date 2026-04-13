@@ -251,6 +251,13 @@ html, body {
 
 .player-node.advancing {
     background: linear-gradient(135deg,
+        rgba(0, 255, 136, 0.08) 0%,
+        rgba(255, 255, 255, 0.03) 100%);
+    border-color: rgba(0, 255, 136, 0.35);
+}
+
+.player-node.advancing.active {
+    background: linear-gradient(135deg,
         var(--player-advancing) 0%,
         rgba(255, 255, 255, 0.05) 100%);
     border-color: var(--player-advancing-border);
@@ -280,6 +287,46 @@ html, body {
     50% {
         box-shadow: 0 0 50px rgba(255, 215, 0, 0.7);
         border-color: rgba(255, 255, 100, 1);
+    }
+}
+
+.player-node.second {
+    background: linear-gradient(135deg,
+        rgba(192, 192, 192, 0.2) 0%,
+        rgba(255, 255, 255, 0.05) 100%);
+    border-color: rgba(192, 192, 192, 0.8);
+    box-shadow: 0 0 20px rgba(192, 192, 192, 0.4);
+    animation: silverFlash 1.5s ease-in-out infinite;
+}
+
+@keyframes silverFlash {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(192, 192, 192, 0.4);
+        border-color: rgba(192, 192, 192, 0.8);
+    }
+    50% {
+        box-shadow: 0 0 35px rgba(192, 192, 192, 0.6);
+        border-color: rgba(220, 220, 220, 1);
+    }
+}
+
+.player-node.third {
+    background: linear-gradient(135deg,
+        rgba(205, 127, 50, 0.2) 0%,
+        rgba(255, 255, 255, 0.05) 100%);
+    border-color: rgba(205, 127, 50, 0.8);
+    box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+    animation: bronzeFlash 1.5s ease-in-out infinite;
+}
+
+@keyframes bronzeFlash {
+    0%, 100% {
+        box-shadow: 0 0 15px rgba(205, 127, 50, 0.4);
+        border-color: rgba(205, 127, 50, 0.8);
+    }
+    50% {
+        box-shadow: 0 0 25px rgba(205, 127, 50, 0.6);
+        border-color: rgba(220, 160, 80, 1);
     }
 }
 

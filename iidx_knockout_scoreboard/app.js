@@ -163,11 +163,39 @@ class TournamentApp {
             case 'settle':
                 this.handleSettle(message.data);
                 break;
+            case 'continue':
+                this.handleContinue();
+                break;
             case 'reset':
                 this.handleReset();
                 break;
             default:
                 console.warn('Unknown command:', message.cmd);
+        }
+    }
+
+    /**
+     * Continue to the next stage after current group is settled.
+     * Removes active highlight from current group and activates the next one.
+     */
+    handleContinue() {
+        const currentGroup = this.tournamentState.currentActiveGroup;
+        if (!currentGroup) {
+            console.log('No active group to continue from');
+            return;
+        }
+
+        console.log(`➡️ Continue from Group ${currentGroup}`);
+
+        const groupOrder = ['A', 'B', 'C', 'D', 'E', 'F', 'finals'];
+        const currentIndex = groupOrder.indexOf(currentGroup);
+        if (currentIndex !== -1 && currentIndex < groupOrder.length - 1) {
+            const nextGroup = groupOrder[currentIndex + 1];
+            this.tournamentState.currentActiveGroup = nextGroup;
+            this.highlightGroup(nextGroup);
+            this.updateStageIndicator(nextGroup);
+        } else {
+            console.log('Already at the final stage');
         }
     }
 
@@ -240,6 +268,7 @@ class TournamentApp {
         this.tournamentState.currentStage = 'quarterfinal';
         this.tournamentState.currentActiveGroup = 'A';
         this.highlightGroup('A');
+        this.updateStageIndicator('A');
         console.log('Tournament initialized:', this.tournamentState);
     }
 
@@ -335,6 +364,11 @@ class TournamentApp {
                 });
             }
         }
+
+        // Auto-settle after 4 rounds for non-final groups
+        if (stage !== 'final' && groupState.scores.length === 4 && !groupState.settled) {
+            this.handleSettle({ stage, group });
+        }
     }
 
     /**
@@ -401,9 +435,11 @@ class TournamentApp {
                 this.setPlayerState(group, player.position, 'eliminated');
             }
 
-            // Mark advancing players
+            // Mark advancing players (keep strong green glow until continue)
             for (const player of advancing) {
                 this.setPlayerState(group, player.position, 'advancing');
+                const node = this.getPlayerNode(group, player.position);
+                if (node) node.classList.add('active');
             }
 
             // Store advancing players in group state
@@ -463,47 +499,75 @@ class TournamentApp {
                     });
                 }
             }
-
-            // Advance active group highlight
-            const groupOrder = ['A', 'B', 'C', 'D', 'E', 'F', 'finals'];
-            const currentIndex = groupOrder.indexOf(group);
-            if (currentIndex !== -1 && currentIndex < groupOrder.length - 1) {
-                const nextGroup = groupOrder[currentIndex + 1];
-                this.tournamentState.currentActiveGroup = nextGroup;
-                this.highlightGroup(nextGroup);
-            }
         } else {
             // stage === 'final'
+            const medals = ['🥇', '🥈', '🥉', ''];
+
             if (!groupState.inTiebreaker) {
-                // Check for PT ties
-                const hasTie = sortedPlayers.some((p, i) => {
-                    if (i === 0) return false;
-                    return p.points === sortedPlayers[i - 1].points;
-                });
+                // Check for PT ties and group them
+                const tieGroups = [];
+                let i = 0;
+                let hasTie = false;
+
+                while (i < sortedPlayers.length) {
+                    let j = i + 1;
+                    while (j < sortedPlayers.length && sortedPlayers[j].points === sortedPlayers[i].points) {
+                        j++;
+                    }
+                    const group = sortedPlayers.slice(i, j);
+                    if (group.length > 1) {
+                        hasTie = true;
+                        tieGroups.push({ startRank: i, players: group.map(p => p.position) });
+                        // Tie players stay active for tiebreaker
+                        for (const p of group) {
+                            this.setPlayerState('finals', p.position, 'active');
+                        }
+                    } else {
+                        // No tie - assign medal immediately
+                        const player = group[0];
+                        const node = this.getPlayerNode('finals', player.position);
+                        if (node) {
+                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'second', 'third');
+                            if (i === 0) node.classList.add('champion');
+                            else if (i === 1) node.classList.add('second');
+                            else if (i === 2) node.classList.add('third');
+                            const pointsEl = node.querySelector('.player-points');
+                            if (pointsEl) pointsEl.textContent = medals[i] || '';
+                        }
+                    }
+                    i = j;
+                }
 
                 if (hasTie) {
                     groupState.inTiebreaker = true;
-                    for (const player of groupState.players) {
-                        this.setPlayerState('finals', player.position, 'active');
-                    }
-                    console.log('🏁 Finals tied! Entering tiebreaker.');
+                    groupState.tieGroups = tieGroups;
+                    console.log('🏁 Finals tied! Entering tiebreaker for tied players.');
                     return;
                 }
-            }
+            } else {
+                // In tiebreaker - resolve within each tie group
+                for (const tg of groupState.tieGroups) {
+                    const groupPlayers = tg.players
+                        .map(pos => groupState.players.find(p => p.position === pos))
+                        .filter(p => p);
+                    groupPlayers.sort((a, b) => (b.tiebreakerScore || 0) - (a.tiebreakerScore || 0));
 
-            // Assign medals
-            const medals = ['🥇', '🥈', '🥉', ''];
-            for (let i = 0; i < sortedPlayers.length; i++) {
-                const player = sortedPlayers[i];
-                const node = this.getPlayerNode('finals', player.position);
-                if (node) {
-                    node.classList.remove('active', 'eliminated', 'advancing');
-                    if (i === 0) {
-                        node.classList.add('champion');
+                    for (let k = 0; k < groupPlayers.length; k++) {
+                        const player = groupPlayers[k];
+                        const rank = tg.startRank + k;
+                        const node = this.getPlayerNode('finals', player.position);
+                        if (node) {
+                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'second', 'third');
+                            if (rank === 0) node.classList.add('champion');
+                            else if (rank === 1) node.classList.add('second');
+                            else if (rank === 2) node.classList.add('third');
+                            const pointsEl = node.querySelector('.player-points');
+                            if (pointsEl) pointsEl.textContent = medals[rank] || '';
+                        }
                     }
-                    const pointsEl = node.querySelector('.player-points');
-                    if (pointsEl) pointsEl.textContent = medals[i] || '';
                 }
+                groupState.inTiebreaker = false;
+                groupState.tieGroups = null;
             }
         }
     }
@@ -533,6 +597,25 @@ class TournamentApp {
             points: 0,
             rank: '-'
         });
+    }
+
+    /**
+     * Update stage indicator text based on current active group
+     */
+    updateStageIndicator(groupName) {
+        const indicatorMap = {
+            A: '1/4决赛 第一场',
+            B: '1/4决赛 第二场',
+            C: '1/4决赛 第三场',
+            D: '1/4决赛 第四场',
+            E: '半决赛 第一场',
+            F: '半决赛 第二场',
+            finals: '决赛'
+        };
+        const indicatorEl = document.querySelector('.stage-indicator');
+        if (indicatorEl) {
+            indicatorEl.textContent = indicatorMap[groupName] || '1/4决赛';
+        }
     }
 
     /**
@@ -579,6 +662,10 @@ class TournamentApp {
                 points: 0,
                 rank: '-'
             });
+            const node = this.getPlayerNode('finals', position);
+            if (node) {
+                node.classList.remove('champion', 'second', 'third');
+            }
             this.setPlayerState('finals', position, '');
         }
 
@@ -591,6 +678,9 @@ class TournamentApp {
             const titleTextEl = titleEl.querySelector('.title-text');
             if (titleTextEl) titleTextEl.textContent = '淘汰赛';
         }
+
+        // Reset stage indicator
+        this.updateStageIndicator('A');
     }
 
     // ==========================================
