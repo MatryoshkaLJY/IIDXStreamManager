@@ -47,17 +47,17 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CONF-01 | TBD | — |
-| CONF-02 | TBD | — |
-| CONF-03 | TBD | — |
-| CONF-04 | TBD | — |
-| CONF-05 | TBD | — |
-| OBS-01 | TBD | — |
-| OBS-02 | TBD | — |
-| MON-01 | TBD | — |
-| MON-02 | TBD | — |
-| MON-03 | TBD | — |
-| SCR-01 | TBD | — |
-| SCR-02 | TBD | — |
-| SCR-03 | TBD | — |
-| SCR-04 | TBD | — |
+| CONF-01 | Phase 2 | Pending |
+| CONF-02 | Phase 1 | Pending |
+| CONF-03 | Phase 1 | Pending |
+| CONF-04 | Phase 2 | Pending |
+| CONF-05 | Phase 1 | Pending |
+| OBS-01 | Phase 3 | Pending |
+| OBS-02 | Phase 3 | Pending |
+| MON-01 | Phase 4 | Pending |
+| MON-02 | Phase 4 | Pending |
+| MON-03 | Phase 5 | Pending |
+| SCR-01 | Phase 6 | Pending |
+| SCR-02 | Phase 6 | Pending |
+| SCR-03 | Phase 6 | Pending |
+| SCR-04 | Phase 6 | Pending |
