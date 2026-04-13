@@ -90,7 +90,7 @@ Destructive reserved for:
 
 | Element | Copy |
 |---------|------|
-| Primary CTA | "Save Settings" |
+| Primary CTA | "Apply Director Config" |
 | Empty state heading | "No config loaded" |
 | Empty state body | "Place teams.json, team_schedule.json, and individual_schedule.json in the data/ folder, then restart the application." |
 | Error state | "Config error: {detail}. Fix the file and reload the page to retry." |
