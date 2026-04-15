@@ -63,6 +63,19 @@
 </div>
 
 <div class="card">
+  <h2 class="heading">Cabinet Monitoring</h2>
+  <p id="monitor-status-label" class="{% if monitoring_active %}status-ok{% else %}status-warning{% endif %}">
+    Monitoring: {% if monitoring_active %}Active{% else %}Stopped{% endif %}
+  </p>
+  <form id="monitor-control-form" method="post" action="{{ url_for('monitor_control') }}">
+    <input type="hidden" name="action" id="monitor-action" value="{% if monitoring_active %}stop{% else %}start{% endif %}">
+    <button type="submit" id="monitor-toggle-btn">
+      {% if monitoring_active %}Stop Monitoring{% else %}Start Monitoring{% endif %}
+    </button>
+  </form>
+</div>
+
+<div class="card">
   <h2 class="heading">Scene Switching</h2>
   <div class="button-row">
     {% for scene in ["现场摄像", "SP团队赛", "DP团队赛", "个人赛"] %}

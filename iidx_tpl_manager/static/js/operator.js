@@ -6,6 +6,23 @@
   const statusLabel = document.getElementById('obs-status-label');
   const sceneButtons = document.querySelectorAll('.scene-btn');
   const configForm = document.getElementById('obs-config-form');
+  const monitorForm = document.getElementById('monitor-control-form');
+  const monitorBtn = document.getElementById('monitor-toggle-btn');
+  const monitorAction = document.getElementById('monitor-action');
+  const monitorStatusLabel = document.getElementById('monitor-status-label');
+
+  function setMonitoringUI(active) {
+    if (monitorStatusLabel) {
+      monitorStatusLabel.textContent = active ? 'Monitoring: Active' : 'Monitoring: Stopped';
+      monitorStatusLabel.className = active ? 'status-ok' : 'status-warning';
+    }
+    if (monitorBtn) {
+      monitorBtn.textContent = active ? 'Stop Monitoring' : 'Start Monitoring';
+    }
+    if (monitorAction) {
+      monitorAction.value = active ? 'stop' : 'start';
+    }
+  }
 
   function setSceneButtonsDisabled(disabled) {
     sceneButtons.forEach((btn) => {
@@ -75,6 +92,15 @@
     });
   }
 
+  socket.on('monitoring_status', (data) => {
+    setMonitoringUI(!!data.active);
+  });
+
+  socket.on('cabinet_update', (data) => {
+    // Console logging for Phase 5 backend verification (D-01 defers monitor page)
+    console.log('cabinet_update', data);
+  });
+
   if (configForm) {
     configForm.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -96,6 +122,30 @@
         })
         .catch((err) => {
           console.error('OBS config save error', err);
+        });
+    });
+  }
+
+  if (monitorForm) {
+    monitorForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      const formData = new FormData(monitorForm);
+      const payload = {
+        action: formData.get('action') || 'start',
+      };
+      fetch(monitorForm.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then((resp) => resp.json())
+        .then((data) => {
+          if (data && typeof data.active === 'boolean') {
+            setMonitoringUI(data.active);
+          }
+        })
+        .catch((err) => {
+          console.error('Monitor control error', err);
         });
     });
   }
