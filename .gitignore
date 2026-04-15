@@ -1,6 +1,10 @@
 # Data directory
+data/
 iidx_state_reco/data/
 iidx_score_reco/data/
+
+# Runtime state
+runtime/
 # Unused state machine dir
 iidx_stream_state_machine
 # Claude files
