@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}IIDX Tournament Auto-Director{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+  <nav class="card">
+    <a href="{{ url_for('status') }}">Status</a>
+    <a href="#">Config</a>
+  </nav>
+  {% block content %}{% endblock %}
+</body>
+</html>

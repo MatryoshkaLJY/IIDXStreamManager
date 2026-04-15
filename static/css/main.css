@@ -1,0 +1,80 @@
+:root {
+  --color-dominant: #0f172a;
+  --color-secondary: #1e293b;
+  --color-accent: #22c55e;
+  --color-destructive: #ef4444;
+  --color-warning: #f59e0b;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  background: var(--color-dominant);
+  color: var(--color-text-primary);
+  margin: 0;
+  padding: var(--space-md);
+}
+
+.card {
+  background: var(--color-secondary);
+  border-radius: 8px;
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+
+.heading {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0 0 var(--space-sm) 0;
+}
+
+.display {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.status-ok {
+  color: var(--color-accent);
+}
+
+.status-error {
+  color: var(--color-destructive);
+}
+
+.status-warning {
+  color: var(--color-warning);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+nav a {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  margin-right: var(--space-md);
+}
+
+nav a:hover {
+  color: var(--color-text-primary);
+}

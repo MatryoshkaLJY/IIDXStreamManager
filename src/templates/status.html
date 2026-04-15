@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Status — IIDX Tournament Auto-Director{% endblock %}
+{% block content %}
+<div class="card">
+  <h1 class="display">IIDX Tournament Auto-Director</h1>
+  <p class="status-ok">Server running on port {{ server_port }}</p>
+  <p class="label">State persistence: <span class="mono">{{ state_path }}</span></p>
+</div>
+
+<div class="card">
+  <h2 class="heading">Loaded Configs</h2>
+  {% if config_error %}
+    <p class="status-error">{{ config_error }}</p>
+    <p class="label">No config loaded</p>
+    <p>Place teams.json, team_schedule.json, and individual_schedule.json in the data/ folder, then restart the application.</p>
+  {% else %}
+    <p class="status-ok">All configs loaded successfully.</p>
+    <ul>
+      {% for key, path in runtime_state.config_paths.items() %}
+        <li class="mono">{{ key }}: {{ path }}</li>
+      {% endfor %}
+    </ul>
+    {% if runtime_state.loaded_at %}
+      <p class="label">Loaded at: {{ runtime_state.loaded_at }}</p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
