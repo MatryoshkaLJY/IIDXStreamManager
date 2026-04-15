@@ -1,10 +1,11 @@
 ---
 phase: 3
 slug: obs-integration-scene-control
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-15
+reviewed_at: 2026-04-15
 ---
 
 # Phase 3 — UI Design Contract
@@ -48,8 +49,8 @@ Exceptions: none
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 16px | 400 | 1.5 |
-| Label | 14px | 600 | 1.4 |
-| Heading | 20px | 600 | 1.2 |
+| Label | 14px | 700 | 1.4 |
+| Heading | 20px | 700 | 1.2 |
 | Display | 28px | 700 | 1.15 |
 
 ---
@@ -112,6 +113,11 @@ Accent reserved for:
 - Uses `.status-error` text color on secondary background
 - Includes inline "Reconnect to OBS" or "Retry Validation" button
 - Banner is hidden when connection and validation are healthy
+
+### Visual Hierarchy / Focal Point
+- The warning banner (when visible) is the primary focal point at the top of the status page.
+- When no warning is present, the scene-switching button row draws the eye as the main actionable area.
+- The OBS connection config form is secondary, collapsed visually below the button row.
 
 ### Connection Status Indicator
 - Small label below the banner: "OBS: Connected" (`.status-ok`) or "OBS: Disconnected" (`.status-error`)
