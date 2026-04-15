@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: Tournament Rule Refinements
-status: completed
-last_updated: "2026-04-15T05:02:46.035Z"
-last_activity: 2026-04-15 -- Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Auto-Director Core
+status: defining_requirements
+last_updated: "2026-04-15T13:10:00.000Z"
+last_activity: 2026-04-15 -- Milestone v1.2 started
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
-# State: IIDX Stream Manager
+# State: IIDX Tournament Auto-Director
 
 ## Current Position
 
-Phase: 02 (tournament-rule-refinements) — COMPLETE
-Plan: 2 of 2
-Status: Milestone v1.1 complete
-Last activity: 2026-04-15 -- Milestone v1.1 completed and archived
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-04-15 -- Milestone v1.2 started
 
 ## Project Reference
 
 See: .planning/PROJECT.md (updated 2026-04-15)
 
 **Core value:** Reliable, visually polished tournament scoreboards that integrate cleanly into streaming workflows via WebSocket control.
-**Current focus:** Planning next milestone
+**Current focus:** Defining v1.2 Auto-Director Core requirements and roadmap
 
 ## Accumulated Context
 
@@ -35,4 +35,4 @@ See: .planning/PROJECT.md (updated 2026-04-15)
 - v1.1 shipped with knockout rule refinements: cumulative scoring, E/F semifinal groups, auto-advance, tiebreaker, and medal styling (6/6 jsdom tests passing).
 - Milestone artifacts archived to `.planning/milestones/`.
 - `iidx_tpl_manager` has config loader, Flask app shell, and runtime state persistence ready.
-- Ready for next milestone: operator UI, OBS integration, cabinet monitoring, score review workflow.
+- Ready for v1.2: operator UI, OBS integration, cabinet monitoring, score review workflow.

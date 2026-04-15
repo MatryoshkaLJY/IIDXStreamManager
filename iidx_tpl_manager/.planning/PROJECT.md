@@ -64,12 +64,19 @@ Build a single Python web application (`iidx_tpl_manager`) that unifies monitori
 - *(Future)* `Scoreboard_game` — In-game score result screen
 - *(Future)* `Scoreboard_web` — Web scoreboard browser source
 
-## Next Milestone Goals
+## Current Milestone: v1.2 Auto-Director Core
 
+**Goal:** Unify tournament operation into a single web control panel with OBS scene automation, cabinet monitoring, and score review workflow.
+
+**Target features:**
 - Operator UI for tournament mode selection and round-prep player assignments
 - OBS WebSocket integration for programmatic scene switching
 - Cabinet monitoring with `obs_manager.py` and real-time state display
 - Score review workflow with operator confirmation and scoreboard push
+
+## Next Milestone Goals
+
+TBD after v1.2 completion.
 
 ## Requirements
 
