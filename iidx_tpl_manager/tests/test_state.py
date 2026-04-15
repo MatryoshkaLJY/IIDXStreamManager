@@ -21,6 +21,13 @@ class TestRuntimeState:
         assert state.config_paths == {}
         assert state.loaded_at is None
 
+    def test_default_state_has_obs_defaults(self):
+        state = RuntimeState()
+        assert state.obs_host == "localhost"
+        assert state.obs_port == 4455
+        assert state.obs_password == ""
+        assert state.obs_connected is False
+
 
 class TestSaveRuntimeState:
     def test_writes_json_file(self):
@@ -63,6 +70,37 @@ class TestLoadRuntimeState:
             loaded = load_runtime_state(path)
             assert loaded.config_paths == {}
             assert loaded.loaded_at is None
+
+    def test_load_old_state_without_obs_fields_uses_defaults(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "state.json"
+            old_data = {"config_paths": {"teams": "data/teams.json"}, "loaded_at": "2026-04-15T10:00:00"}
+            path.write_text(json.dumps(old_data), encoding="utf-8")
+            loaded = load_runtime_state(path)
+            assert loaded.config_paths == {"teams": "data/teams.json"}
+            assert loaded.loaded_at == "2026-04-15T10:00:00"
+            assert loaded.obs_host == "localhost"
+            assert loaded.obs_port == 4455
+            assert loaded.obs_password == ""
+            assert loaded.obs_connected is False
+
+    def test_roundtrip_persists_obs_fields(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "state.json"
+            original = RuntimeState(
+                config_paths={"teams": "data/teams.json"},
+                loaded_at="2026-04-15T10:00:00",
+                obs_host="192.168.1.10",
+                obs_port=4444,
+                obs_password="secret",
+                obs_connected=True,
+            )
+            save_runtime_state(original, path)
+            loaded = load_runtime_state(path)
+            assert loaded.obs_host == "192.168.1.10"
+            assert loaded.obs_port == 4444
+            assert loaded.obs_password == "secret"
+            assert loaded.obs_connected is True
 
 
 class TestCreateApp:
