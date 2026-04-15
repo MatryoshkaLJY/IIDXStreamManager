@@ -43,6 +43,15 @@ class OBSClient:
         except Exception:
             return False
 
+    @connected.setter
+    def connected(self, value: bool) -> None:
+        if not value and self._client is not None:
+            try:
+                self._client.disconnect()
+            except Exception:
+                pass
+            self._client = None
+
     def get_version(self) -> Any:
         if self._client is None:
             raise RuntimeError("OBS client is not connected")
