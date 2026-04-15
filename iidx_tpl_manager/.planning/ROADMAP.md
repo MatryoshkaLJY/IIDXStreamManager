@@ -106,6 +106,10 @@ Plan list:
   5. Scoreboard push succeeds using the correct WebSocket protocol for the active tournament mode
 **Plans**: TBD
 **UI hint**: yes
+Plan list:
+- [ ] `06-01-PLAN.md` — Backend Foundation: RuntimeState extension, Round.points, and ScoreboardPusher
+- [ ] `06-02-PLAN.md` — Monitor & App Integration: pending score collection, /confirm_score route, and OBS scene wiring
+- [ ] `06-03-PLAN.md` — Review Panel UI: status.html panel, CSS styles, and operator.js interactivity
 
 ### Phase 7: Auto-Transitions & Configurable Delays
 **Goal**: Broadcast transitions between Live, Gameplay, and Scoreboard_game happen automatically based on cabinet state, with operator override
@@ -131,5 +135,5 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7
 | 3. OBS Integration & Scene Control | v1.2 | 0/4 | Not started | - |
 | 4. Tournament Setup & Round Prep UI | v1.2 | 0/TBD | Not started | - |
 | 5. Cabinet Monitoring & Live Monitor UI | v1.2 | 0/TBD | Not started | - |
-| 6. Score Review & Scoreboard Integration | v1.2 | 0/TBD | Not started | - |
+| 6. Score Review & Scoreboard Integration | v1.2 | 0/3 | Not started | - |
 | 7. Auto-Transitions & Configurable Delays | v1.2 | 0/TBD | Not started | - |
