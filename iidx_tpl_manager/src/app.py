@@ -38,6 +38,8 @@ def create_app(return_socketio: bool = False):
         password=runtime_state.obs_password,
     )
     scene_controller = SceneController(client)
+    app._scene_controller = scene_controller
+    app._obs_client = client
 
     def _validate_and_emit_obs_state() -> None:
         scene_controller.validate_scenes()
