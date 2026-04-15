@@ -1,6 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Status — IIDX Tournament Auto-Director{% endblock %}
 {% block content %}
+<div id="obs-banner" class="card" style="display: {% if not obs_connected or missing_scenes %}block{% else %}none{% endif %};">
+  <p id="obs-banner-text" class="status-error">
+    {% if not obs_connected %}
+      OBS disconnected. Scene switching and auto-transitions are paused.
+      <button id="obs-reconnect-btn" type="button">Reconnect to OBS</button>
+    {% elif missing_scenes %}
+      OBS scenes missing: {{ missing_scenes | join(", ") }}. Please add them in OBS, then click Retry Validation.
+      <button id="obs-reconnect-btn" type="button">Retry Validation</button>
+    {% endif %}
+  </p>
+</div>
+
+<p id="obs-status-label" class="{% if obs_connected and not missing_scenes %}status-ok{% else %}status-error{% endif %}">
+  OBS: {% if obs_connected and not missing_scenes %}Connected{% else %}Disconnected{% endif %}
+</p>
+
 <div class="card">
   <h1 class="display">IIDX Tournament Auto-Director</h1>
   <p class="status-ok">Server running on port {{ server_port }}</p>
@@ -25,4 +41,41 @@
     {% endif %}
   {% endif %}
 </div>
+
+<div class="card">
+  <h2 class="heading">OBS Connection</h2>
+  <form id="obs-config-form" method="post" action="{{ url_for('obs_config') }}">
+    <div class="form-row">
+      <label class="label" for="obs-host">Host</label>
+      <input type="text" id="obs-host" name="host" value="{{ runtime_state.obs_host }}" required>
+      <span class="hint">Use localhost or 127.0.0.1 for local OBS</span>
+    </div>
+    <div class="form-row">
+      <label class="label" for="obs-port">Port</label>
+      <input type="number" id="obs-port" name="port" value="{{ runtime_state.obs_port }}" required>
+    </div>
+    <div class="form-row">
+      <label class="label" for="obs-password">Password</label>
+      <input type="password" id="obs-password" name="password" value="{{ runtime_state.obs_password }}">
+    </div>
+    <button type="submit" {% if not obs_connected and missing_scenes %}disabled{% endif %}>Save & Reconnect</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 class="heading">Scene Switching</h2>
+  <div class="button-row">
+    {% for scene in ["现场摄像", "SP团队赛", "DP团队赛", "个人赛"] %}
+      <form method="post" action="{{ url_for('switch_scene') }}" class="scene-form">
+        <input type="hidden" name="scene" value="{{ scene }}">
+        <button type="submit" class="scene-btn" {% if not obs_connected or not scenes_valid %}disabled{% endif %}>{{ scene }}</button>
+      </form>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script src="{{ url_for('static', filename='js/operator.js') }}"></script>
 {% endblock %}

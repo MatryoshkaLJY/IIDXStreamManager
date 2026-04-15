@@ -69,6 +69,62 @@ body {
   line-height: 1.4;
 }
 
+.hint {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: var(--space-xs);
+}
+
+.form-row {
+  margin-bottom: var(--space-sm);
+}
+.form-row input {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  padding: var(--space-sm);
+  background: var(--color-dominant);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-text-secondary);
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.scene-form {
+  display: inline;
+}
+.scene-btn {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.scene-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+}
+.scene-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+#obs-banner button {
+  margin-left: var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--color-dominant);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-text-secondary);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 nav a {
   color: var(--color-text-secondary);
   text-decoration: none;
