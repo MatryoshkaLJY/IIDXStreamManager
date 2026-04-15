@@ -1,11 +1,25 @@
+---
+gsd_state_version: 1.0
+milestone: v1.1
+milestone_name: Tournament Rule Refinements
+status: planning
+last_updated: "2026-04-15T02:49:33.036Z"
+last_activity: 2026-04-15
+progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+---
+
 # State: IIDX Stream Manager
 
 ## Current Position
 
 Phase: 2
-Plan: 01
-Status: Ready to discuss
-Last activity: 2026-04-13 — Roadmap defined for v1.1
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-04-15
 
 ## Project Reference
 
