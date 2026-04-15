@@ -10,7 +10,8 @@ from flask_socketio import SocketIO
 try:
     from obs_manager.obs_manager import OBSManager
 except ImportError:
-    project_root = str(Path(__file__).resolve().parents[2])
+    # obs_manager is in a sibling directory to the project root
+    project_root = str(Path(__file__).resolve().parents[3])
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
     from obs_manager.obs_manager import OBSManager
