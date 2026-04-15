@@ -370,7 +370,7 @@ def create_app(return_socketio: bool = False):
     # Flask does not provide a standard shutdown hook for the dev server;
     # the heartbeat thread is daemonized and will terminate with the process.
 
-    monitor = CabinetMonitor(socketio)
+    monitor = CabinetMonitor(socketio, state_machine_config=runtime_state.state_machine_config)
     app._cabinet_monitor = monitor
 
     # D-07: monitoring does not auto-start on app launch

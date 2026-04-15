@@ -26,6 +26,7 @@ class RuntimeState:
         "IIDX#3": "IIDX#3",
         "IIDX#4": "IIDX#4",
     })
+    state_machine_config: str = "iidx_state_machine/state_machine.yaml"
 
 
 def save_runtime_state(state: RuntimeState, path: Path = RUNTIME_STATE_PATH) -> None:
@@ -57,4 +58,5 @@ def load_runtime_state(path: Path = RUNTIME_STATE_PATH) -> RuntimeState:
             "IIDX#3": "IIDX#3",
             "IIDX#4": "IIDX#4",
         }),
+        state_machine_config=data.get("state_machine_config", "iidx_state_machine/state_machine.yaml"),
     )

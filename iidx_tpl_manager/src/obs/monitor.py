@@ -76,8 +76,12 @@ class CabinetMonitor:
                 logger.warning("CabinetMonitor failed to connect to OBS: %s", exc)
                 return None
 
+            config_path = Path(self.state_machine_config)
+            if not config_path.is_absolute():
+                workspace_root = Path(__file__).resolve().parents[3]
+                config_path = workspace_root / config_path
             try:
-                obs.init_state_machine(self.state_machine_config, log_level="INFO", simple_mode=True)
+                obs.init_state_machine(str(config_path), log_level="INFO", simple_mode=True)
             except Exception as exc:
                 logger.warning("CabinetMonitor failed to init state machine: %s", exc)
                 try:
