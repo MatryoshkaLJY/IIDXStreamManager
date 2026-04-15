@@ -11,6 +11,10 @@ RUNTIME_STATE_PATH = Path("runtime/state.json")
 class RuntimeState:
     config_paths: Dict[str, str] = field(default_factory=dict)
     loaded_at: Optional[str] = None
+    obs_host: str = "localhost"
+    obs_port: int = 4455
+    obs_password: str = ""
+    obs_connected: bool = False
 
 
 def save_runtime_state(state: RuntimeState, path: Path = RUNTIME_STATE_PATH) -> None:
@@ -27,4 +31,8 @@ def load_runtime_state(path: Path = RUNTIME_STATE_PATH) -> RuntimeState:
     return RuntimeState(
         config_paths=data.get("config_paths", {}),
         loaded_at=data.get("loaded_at"),
+        obs_host=data.get("obs_host", "localhost"),
+        obs_port=data.get("obs_port", 4455),
+        obs_password=data.get("obs_password", ""),
+        obs_connected=data.get("obs_connected", False),
     )
