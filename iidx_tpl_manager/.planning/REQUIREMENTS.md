@@ -51,4 +51,26 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (To be filled during roadmapping) | | |
+| OBS-01 | Phase 3 | Pending |
+| OBS-02 | Phase 3 | Pending |
+| OBS-03 | Phase 3 | Pending |
+| OBS-04 | Phase 3 | Pending |
+| UI-01 | Phase 4 | Pending |
+| UI-02 | Phase 4 | Pending |
+| UI-03 | Phase 4 | Pending |
+| UI-04 | Phase 4 | Pending |
+| AUTO-05 | Phase 4 | Pending |
+| MON-01 | Phase 5 | Pending |
+| MON-02 | Phase 5 | Pending |
+| MON-03 | Phase 5 | Pending |
+| MON-04 | Phase 5 | Pending |
+| SCR-01 | Phase 6 | Pending |
+| SCR-02 | Phase 6 | Pending |
+| SCR-03 | Phase 6 | Pending |
+| SCR-04 | Phase 6 | Pending |
+| SCR-05 | Phase 6 | Pending |
+| SCR-06 | Phase 6 | Pending |
+| AUTO-01 | Phase 7 | Pending |
+| AUTO-02 | Phase 7 | Pending |
+| AUTO-03 | Phase 7 | Pending |
+| AUTO-04 | Phase 7 | Pending |
