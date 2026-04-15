@@ -451,15 +451,11 @@ assert received[0]["name"] == "obs_status"
 | A2 | The `websocket.WebSocket.connected` property reliably returns `False` after the underlying socket is closed or connection fails | Architecture Patterns | If unreliable, heartbeat may falsely report "connected"; fallback is to catch exceptions on `get_version()` |
 | A3 | Flask-SocketIO's `threading` async_mode is sufficient for a single-operator local app and will not become a bottleneck | Architecture Patterns | If future requirements demand multiple operators, a message broker (Redis) would be needed |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Should scene switching use HTTP POST or SocketIO events?**
-   - What we know: Both work. HTTP POST is simpler and matches existing Jinja2 form patterns. SocketIO is more responsive and keeps the UI state in one channel.
-   - Recommendation: Use HTTP POST for the scene-switcher buttons to keep the initial implementation simple and server-rendered. Use SocketIO only for push events (status, reconnect).
+1. **Should scene switching use HTTP POST or SocketIO events?** — RESOLVED: Use HTTP POST for the scene-switcher buttons to keep the initial implementation simple and server-rendered. Use SocketIO only for push events (status, reconnect).
 
-2. **Where should the OBS config form live — a separate `/obs_config` page or inline on the status page?**
-   - What we know: The status page is currently sparse. A separate page keeps concerns clean but adds navigation.
-   - Recommendation: Inline the config form and scene controls on the status page for Phase 3. The operator's primary workflow is a single dashboard.
+2. **Where should the OBS config form live — a separate `/obs_config` page or inline on the status page?** — RESOLVED: Inline the config form and scene controls on the status page for Phase 3. The operator's primary workflow is a single dashboard.
 
 ## Environment Availability
 
@@ -577,9 +573,9 @@ assert received[0]["name"] == "obs_status"
 | Architecture | HIGH | Patterns validated with mock clients, SocketIO test client, and threading tests |
 | Pitfalls | HIGH | Derived from direct source inspection of obsws-python and Flask-SocketIO |
 
-### Open Questions
-- Whether scene switching should use HTTP POST or SocketIO events (recommendation: HTTP POST for simplicity).
-- Whether OBS config should be inline on the status page or a separate page (recommendation: inline for Phase 3).
+### Open Questions (RESOLVED)
+- Whether scene switching should use HTTP POST or SocketIO events — RESOLVED: HTTP POST for simplicity.
+- Whether OBS config should be inline on the status page or a separate page — RESOLVED: inline on the status page for Phase 3.
 
 ### Ready for Planning
 Research complete. Planner can now create PLAN.md files.
