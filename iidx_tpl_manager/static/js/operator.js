@@ -133,7 +133,7 @@
       const payload = {
         action: formData.get('action') || 'start',
       };
-      fetch(monitorForm.action, {
+      fetch(monitorForm.getAttribute('action'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
