@@ -1,52 +1,22 @@
-# STATE
-
-## Project Reference
-
-**Project**: IIDX Tournament Auto-Director  
-**Core Value**: Unify monitoring, scene automation, and scoreboard integration into a single Python web application so the tournament stream operator can run a full round with minimal manual intervention.
+# State: IIDX Stream Manager
 
 ## Current Position
 
-**Current Phase**: 1 — Foundation & Config  
-**Current Plan**: TBD  
-**Status**: Context gathered  
-**Progress**: 0/6 phases
+Phase: 2
+Plan: 01
+Status: Ready to discuss
+Last activity: 2026-04-13 — Roadmap defined for v1.1
 
-```
-[          ] 0%
-```
+## Project Reference
 
-## Performance Metrics
+See: .planning/PROJECT.md (updated 2026-04-13)
 
-- **Requirements completed**: 0/14
-- **Phases completed**: 0/6
-- **Last milestone**: —
+**Core value:** Reliable, visually polished tournament scoreboards that integrate cleanly into streaming workflows via WebSocket control.
+**Current focus:** Planning v1.1 tournament rule refinements.
 
 ## Accumulated Context
 
-### Decisions
-- Flask on port 5002 (operator preference, avoids conflict with web_monitor.py on 5001)
-- Reuse `obs_manager.py` as a library for frame capture and recognition
-- One mode per event (simplifies UI and state management)
-- Delays configurable including `-1` for fully manual advance
-
-### TODOs
-- [ ] Build Flask app shell with SocketIO
-- [ ] Implement JSON config loading with Pydantic validation
-- [ ] Add runtime state persistence
-- [ ] Build round-prep UI for mode selection and player assignment
-- [ ] Integrate OBS WebSocket for scene switching
-- [ ] Implement 4-cabinet polling thread
-- [ ] Build live monitor UI
-- [ ] Implement scene automation rules
-- [ ] Build score review UI with editing
-- [ ] Integrate scoreboard push (BPL 8080, knockout 8081)
-- [ ] Add configurable timing delays
-
-### Blockers
-- None
-
-## Session Continuity
-
-**Last action**: Roadmap created  
-**Next expected action**: `/gsd-plan-phase 1`
+- v1.0 shipped with a 16-player knockout tournament scoreboard using vanilla HTML/CSS/JS and a Python WebSocket relay.
+- All UAT gaps from v1.0 were addressed and the milestone was tagged v1.0.
+- Phase artifacts archived to `.planning/milestones/v1.0-phases/`.
+- Previous phase directories cleared; ready for new milestone planning.

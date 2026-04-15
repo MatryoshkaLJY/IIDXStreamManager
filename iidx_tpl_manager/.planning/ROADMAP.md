@@ -1,91 +1,68 @@
-# ROADMAP
+# Roadmap: IIDX Stream Manager
+
+## Milestones
+
+- **v1.0 Knockout Tournament Scoreboard** — Phase 1 (shipped 2026-04-13)
 
 ## Phases
 
-- [ ] **Phase 1: Foundation & Config** - Flask app shell, JSON config loading/validation, and runtime state persistence
-- [ ] **Phase 2: Tournament Setup** - Web UI for mode selection and round-prep player-to-cabinet assignment
-- [ ] **Phase 3: OBS Integration** - OBS WebSocket connection, manual scene switching, and scene name validation
-- [ ] **Phase 4: Live Monitoring** - Continuous 4-cabinet polling and real-time state display in the web UI
-- [ ] **Phase 5: Scene Automation** - Automatic scene transitions based on aggregate game state from the state machine
-- [ ] **Phase 6: Score Workflow** - Score capture, review/correction UI, scoreboard push, and configurable post-confirmation timing
+<details>
+<summary> v1.0 Knockout Tournament Scoreboard (Phase 1) — SHIPPED 2026-04-13</summary>
 
-## Phase Details
+- [x] Phase 1: 16-Player Knockout Tournament Scoreboard (7/7 summaries) — completed 2026-04-13
+  - Plan 01: HTML/CSS structure and radial tree layout
+  - Plan 02: WebSocket server and client communication
+  - Plan 03: Tournament logic and scoring system
+  - Fix 01-01: Index alignment (HTML vs JS)
+  - Fix 01-02: Finals group mapping
+  - Fix 01-03: Visual layout redesign
+  - Fix 01-04: Score/points styling
 
-### Phase 1: Foundation & Config
-**Goal**: Application boots with a working web server and handles tournament configuration reliably
-**Depends on**: Nothing (first phase)
-**Requirements**: CONF-02, CONF-03, CONF-05
-**Success Criteria** (what must be TRUE):
-  1. Operator can start the application and access the web UI at port 5002
-  2. Application loads `teams.json`, `team_schedule.json`, and `individual_schedule.json` from `data/` and reports human-readable validation errors
-  3. Runtime state (configs, settings) is persisted to disk and auto-restored on restart
-**Plans**: 2 plans
-**Plan list**:
-- [ ] `01-01-PLAN.md` — Pydantic config schemas and loader with auto-template generation
-- [ ] `01-02-PLAN.md` — Flask app shell on port 5002, runtime state persistence, and status UI
-**UI hint**: yes
+See archive: [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
-### Phase 2: Tournament Setup
-**Goal**: Operator can configure a tournament round through the web UI
-**Depends on**: Phase 1
-**Requirements**: CONF-01, CONF-04
-**Success Criteria** (what must be TRUE):
-  1. Operator can select team match or individual knockout mode from the web UI
-  2. Operator can assign each player to one of 4 cabinet numbers on a round-prep page before each round
-  3. Round assignments are displayed and can be modified until the round starts
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 3: OBS Integration
-**Goal**: Application can control OBS scenes programmatically
-**Depends on**: Phase 1
-**Requirements**: OBS-01, OBS-02
-**Success Criteria** (what must be TRUE):
-  1. Application connects to OBS WebSocket on startup and reports connection status in the web UI
-  2. Operator can switch OBS scenes manually from the web UI
-  3. Configured scene names are validated against OBS's actual scene list, with mismatches reported clearly
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 4: Live Monitoring
-**Goal**: Operator can view real-time game state for all 4 cabinets
-**Depends on**: Phase 1
-**Requirements**: MON-01, MON-02
-**Success Criteria** (what must be TRUE):
-  1. Application continuously captures frames and recognizes state for all 4 cabinets via `obs_manager.py`
-  2. Web UI displays the current detected state for each cabinet in real time
-  3. Monitoring runs in the background without blocking the web UI
-**Plans**: TBD
-**UI hint**: yes
-
-### Phase 5: Scene Automation
-**Goal**: Application automatically switches scenes based on detected game state
-**Depends on**: Phase 3, Phase 4
-**Requirements**: MON-03
-**Success Criteria** (what must be TRUE):
-  1. Application automatically switches from Live to Gameplay when cabinets enter play
-  2. Application automatically switches from Gameplay to Scoreboard_game when cabinets enter the score state
-**Plans**: TBD
-
-### Phase 6: Score Workflow
-**Goal**: Operator can review, correct, and publish scores to the broadcast
-**Depends on**: Phase 2, Phase 4, Phase 5
-**Requirements**: SCR-01, SCR-02, SCR-03, SCR-04
-**Success Criteria** (what must be TRUE):
-  1. When a cabinet enters the score state, captured scores appear in the web UI with visual validity indicators
-  2. Operator can edit recognized scores before confirming
-  3. On operator confirmation, application pushes the score to the active scoreboard and triggers the Scoreboard_game → Scoreboard_web transition
-  4. After the configured delays, application automatically returns to Live; delays are configurable in the web UI including `-1` for manual advance
-**Plans**: TBD
-**UI hint**: yes
+</details>
 
 ## Progress
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Foundation & Config | 2/2 | Planned | - |
-| 2. Tournament Setup | 0/0 | Not started | - |
-| 3. OBS Integration | 0/0 | Not started | - |
-| 4. Live Monitoring | 0/0 | Not started | - |
-| 5. Scene Automation | 0/0 | Not started | - |
-| 6. Score Workflow | 0/0 | Not started | - |
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Knockout Scoreboard | v1.0 | 7/7 | Complete | 2026-04-13 |
+
+### v1.1 Tournament Rule Refinements (In Progress)
+
+- [ ] Phase 2: Tournament Rule Refinements (0/2 plans) — started 2026-04-13
+
+## Phase Details
+
+### Phase 2: Tournament Rule Refinements
+
+**Goal**: Refine the knockout tournament scoreboard with improved scoring, group progression, and visual feedback rules.
+**Depends on**: Phase 1
+**Requirements**:
+  - UI-01: Remove champion trophy and related code
+  - UI-02: Final stage medal visuals (🥇🥈🥉) and champion gold glow
+  - SCOR-01: Cumulative raw score tracking per round
+  - SCOR-02: Updated sorting rules (groups by PT→score; final by PT only with extra-round tiebreaker)
+  - PROG-01: Restructure semifinals into E/F groups with new composition and match order
+  - PROG-02: Active group highlighting that advances automatically after settlement
+  - CMD-01: Fix init command to preserve stage-indicator and title-text
+**Success Criteria**:
+  1. Champion trophy code and UI fully removed
+  2. Score commands accumulate raw scores across rounds
+  3. E/F group composition and A→B→C→D→E→F→Final order works end-to-end
+  4. Active group highlighting advances automatically after settle
+  5. Sorting rules match spec for groups and finals
+  6. Final stage renders medals and champion gold glow
+  7. Init command preserves header structure
+**Plans**: 2 plans
+  - Plan 01: Cleanup and Foundation Fixes (remove trophy, fix init, cumulative scoring)
+  - Plan 02: Group Restructure, Progression, and Finals Visuals (E/F groups, active highlighting, sorting, medals)
+
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1. Knockout Scoreboard | v1.0 | 7/7 | Complete | 2026-04-13 |
+| 2. Rule Refinements | v1.1 | 0/2 | In Progress | - |
+
+---
