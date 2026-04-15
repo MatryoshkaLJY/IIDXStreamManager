@@ -56,8 +56,14 @@ See archive: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
   2. Operator can click a button in the web UI to switch OBS to any of the four main scenes (Live, SP team, DP team, individual)
   3. Gameplay scenes show the correct group visibility and text source values for SP vs DP setup
   4. If OBS WebSocket disconnects, the UI displays a warning banner and auto-switching pauses
-**Plans**: TBD
+**Plans**: 4 plans
 **UI hint**: yes
+
+Plan list:
+- [ ] `03-01-PLAN.md` — Backend Core: RuntimeState, OBSClient, SceneController, and unit tests
+- [ ] `03-02-PLAN.md` — Flask Integration: heartbeat thread, routes, SocketIO handlers, and tests
+- [ ] `03-03-PLAN.md` — UI: templates, CSS, operator.js SocketIO client
+- [ ] `03-04-PLAN.md` — Human Verification: end-to-end OBS connection and scene switching checkpoint
 
 ### Phase 4: Tournament Setup & Round Prep UI
 **Goal**: Operator can configure tournament mode, load configs, and assign players to cabinets
@@ -88,10 +94,10 @@ See archive: [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 **Depends on**: Phase 5
 **Requirements**: SCR-01, SCR-02, SCR-03, SCR-04, SCR-05, SCR-06
 **Success Criteria** (what must be TRUE):
-  1. When a cabinet reaches `score` state with valid OCR, the scores automatically appear in the review UI
+  1. When a cabinet reaches `score` state with valid OCR results, the scores automatically appear in the review UI
   2. Scores flagged as invalid by the recognition service are visually highlighted in the review UI
   3. Operator can click to edit any recognized score before confirming
-  4. On confirmation, the app switches OBS to `Scoreboard_web`, waits, then pushes the score to the correct scoreboard server (BPL or knockout)
+  4. On confirmation, the app switches OBS to `Scoreboard_web` scene, waits, then pushes the score to the correct scoreboard server (BPL or knockout)
   5. Scoreboard push succeeds using the correct WebSocket protocol for the active tournament mode
 **Plans**: TBD
 **UI hint**: yes
@@ -117,7 +123,7 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7
 |-------|-----------|----------------|--------|-----------|
 | 1. Knockout Scoreboard | v1.0 | 7/7 | Complete | 2026-04-13 |
 | 2. Rule Refinements | v1.1 | 2/2 | Complete | 2026-04-15 |
-| 3. OBS Integration & Scene Control | v1.2 | 0/TBD | Not started | - |
+| 3. OBS Integration & Scene Control | v1.2 | 0/4 | Not started | - |
 | 4. Tournament Setup & Round Prep UI | v1.2 | 0/TBD | Not started | - |
 | 5. Cabinet Monitoring & Live Monitor UI | v1.2 | 0/TBD | Not started | - |
 | 6. Score Review & Scoreboard Integration | v1.2 | 0/TBD | Not started | - |
