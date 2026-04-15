@@ -1,10 +1,11 @@
 ---
 phase: 04
 slug: tournament-setup-round-prep-ui
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-15
+reviewed_at: 2026-04-15
 ---
 
 # Phase 04 — UI Design Contract
@@ -50,7 +51,7 @@ Exceptions: none
 | Body | 16px | 400 | 1.5 |
 | Label | 14px | 600 | 1.4 |
 | Heading | 20px | 600 | 1.2 |
-| Display | 28px | 700 | 1.15 |
+| Display | 28px | 600 | 1.15 |
 
 ---
 
@@ -67,6 +68,15 @@ Accent reserved for:
 - Success/OK status text
 - Hover state on `.scene-btn` buttons
 - Future primary action emphasis (e.g., "Save Round" on hover)
+
+---
+
+## Visuals / Focal Points
+
+| Page | Primary Focal Point | Description |
+|------|---------------------|-------------|
+| Config page | Mode selection + file upload card | The central card grouping tournament mode radio buttons and the JSON file upload input; this is the first and most important interaction on the page. |
+| Round Prep page | Cabinet assignment grid | The 2x2 grid of cabinet dropdowns mapping players to IIDX#1–IIDX#4; it dominates the viewport and is the core task of round preparation. |
 
 ---
 
