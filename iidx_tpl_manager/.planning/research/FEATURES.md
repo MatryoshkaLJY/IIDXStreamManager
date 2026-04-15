@@ -1,7 +1,7 @@
 # Feature Landscape
 
 **Domain:** Python web-based OBS tournament director for beatmania IIDX
-**Researched:** 2026-04-14
+**Researched:** 2026-04-15
 **Confidence:** HIGH (derived from direct analysis of existing codebase components, protocols, and operator workflows)
 
 ---
@@ -12,17 +12,17 @@ Features users expect. Missing = product feels incomplete.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| **OBS Scene Switching** | Core purpose of a director tool; must cut between Live, Gameplay, and Scoreboard scenes | Low | Already implemented in `switcher.py` and `obs_manager.py` |
-| **Multi-Cabinet Monitoring (4x)** | Tournaments use 4 IIDX cabinets; operator must see all | Medium | `obs_manager.py` already registers machines and polls frames |
-| **Game State Detection Integration** | Automatic switching depends on knowing when gameplay starts/ends | Low | TCP service on 9876 (`iidx_state_reco`) + state machine already exists |
-| **Score OCR Integration** | Feeding scoreboards requires reading arcade screen digits | Low | TCP service on 9877 (`iidx_score_reco`) already exists |
-| **Score Review & Correction UI** | AI misreads are common; operator must fix before broadcast | Medium | Explicit requirement in PROJECT.md |
-| **Tournament Mode Selection** | Team (BPL-style) vs Individual (knockout) are the two supported formats | Low | Required by PROJECT.md |
-| **JSON Config Loading** | Teams, schedules, and brackets must be loadable per event | Low | `data/teams.json`, `team_schedule.json`, `individual_schedule.json` |
-| **Round Prep / Player-to-Cabinet Assignment** | Players move between cabinets each round; dynamic mapping is essential | Medium | Required by PROJECT.md |
-| **Gameplay Scene Setup (SP/DP)** | OBS groups and text sources must be configured per match type | Medium | `switcher.py` already implements `set_sp_team_match` and `set_dp_team_match` |
-| **Scoreboard Push Integration** | Confirmed scores must reach BPL (8080) and knockout (8081) scoreboards | Low | Protocols documented in `PROTOCOL.md` and knockout server |
-| **Configurable Timing Delays** | Different tournaments/streamers want different pacing | Low | PROJECT.md requires delays configurable including `-1` for manual |
+| **OBS Scene Switching** | Core purpose of a director tool; must cut between Live, Gameplay, and Scoreboard scenes | Low | Already implemented in `switcher.py` and `obs_manager.py`. New work: port to `obsws-python` v5 inside Flask app. |
+| **Multi-Cabinet Monitoring (4x)** | Tournaments use 4 IIDX cabinets; operator must see all | Medium | `obs_manager.py` already registers machines and polls frames. New work: expose per-cabinet state via SocketIO to the web UI. |
+| **Game State Detection Integration** | Automatic switching depends on knowing when gameplay starts/ends | Low | TCP service on 9876 (`iidx_state_reco`) + state machine already exists. New work: wire `process_frame()` loop into Flask background thread. |
+| **Score OCR Integration** | Feeding scoreboards requires reading arcade screen digits | Low | TCP service on 9877 (`iidx_score_reco`) already exists. New work: trigger capture on `score` state and surface results in UI. |
+| **Score Review & Correction UI** | AI misreads are common; operator must fix before broadcast | Medium | Explicit requirement in PROJECT.md. Depends on OCR integration and SocketIO push. |
+| **Tournament Mode Selection** | Team (BPL-style) vs Individual (knockout) are the two supported formats | Low | Required by PROJECT.md. UI only; backend mode flag determines which scoreboard to push. |
+| **JSON Config Loading** | Teams, schedules, and brackets must be loadable per event | Low | Already built: `src/config/loader.py` with Pydantic validation. |
+| **Round Prep / Player-to-Cabinet Assignment** | Players move between cabinets each round; dynamic mapping is essential | Medium | Required by PROJECT.md. Depends on config loader and mode selection. |
+| **Gameplay Scene Setup (SP/DP)** | OBS groups and text sources must be configured per match type | Medium | `switcher.py` already implements `set_sp_team_match` and `set_dp_team_match`. New work: port group-visibility and text-source logic into Flask backend. |
+| **Scoreboard Push Integration** | Confirmed scores must reach BPL (8080) and knockout (8081) scoreboards | Low | Protocols documented in `PROTOCOL.md` and knockout server. New work: WebSocket client wrapper and confirmation gating. |
+| **Configurable Timing Delays** | Different tournaments/streamers want different pacing | Low | PROJECT.md requires delays configurable including `-1` for manual. UI sliders/inputs + backend timer logic. |
 
 ---
 
@@ -32,12 +32,12 @@ Features that set this product apart. Not expected, but valued.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| **AI-Assisted Auto-Switching** | Reduces operator cognitive load by automating scene transitions based on real-time state machine output | Medium | Unique because it ties together existing AI services (state reco + state machine) rather than just time-based or manual switching |
-| **Unified Single-Web-App Control Panel** | Replaces disconnected tools (`obs_manager`, `switcher.py`, separate scoreboard servers) with one interface | Medium | PROJECT.md explicitly frames this as the primary value proposition |
-| **One-Click Score Correction** | Faster than retyping; reduces on-air mistakes | Low | Can be implemented with +/- buttons or preset common errors |
-| **Live State Visualization for All 4 Cabinets** | Operator sees not just video but current detected state per cabinet (IDLE, PLAY, SCORE, etc.) | Medium | Leverages `iidx_state_machine` outputs; adds situational awareness beyond raw video |
-| **Delay Override on the Fly** | Operator can pause auto-advance or force immediate transition without leaving the web UI | Low | Configurable `-1` manual mode plus an explicit "Advance Now" button |
-| **Round-Aware Context Preloading** | When operator loads a round, gameplay scene text/groups can be pre-configured before switching | Medium | Reduces visible setup time between rounds |
+| **AI-Assisted Auto-Switching** | Reduces operator cognitive load by automating scene transitions based on real-time state machine output | Medium | Unique because it ties together existing AI services (state reco + state machine) rather than just time-based or manual switching. Depends on multi-cabinet monitoring and OBS integration. |
+| **Unified Single-Web-App Control Panel** | Replaces disconnected tools (`obs_manager`, `switcher.py`, separate scoreboard servers) with one interface | Medium | PROJECT.md explicitly frames this as the primary value proposition. Depends on all table-stakes features. |
+| **One-Click Score Correction** | Faster than retyping; reduces on-air mistakes | Low | Can be implemented with +/- buttons or preset common errors. Enhances Score Review & Correction UI. |
+| **Live State Visualization for All 4 Cabinets** | Operator sees not just video but current detected state per cabinet (IDLE, PLAY, SCORE, etc.) | Medium | Leverages `iidx_state_machine` outputs; adds situational awareness beyond raw video. Depends on game state detection integration and SocketIO. |
+| **Delay Override on the Fly** | Operator can pause auto-advance or force immediate transition without leaving the web UI | Low | Configurable `-1` manual mode plus an explicit "Advance Now" button. Enhances configurable timing delays. |
+| **Round-Aware Context Preloading** | When operator loads a round, gameplay scene text/groups can be pre-configured before switching | Medium | Reduces visible setup time between rounds. Depends on round prep and gameplay scene setup. |
 
 ---
 
@@ -62,7 +62,7 @@ Features to explicitly NOT build.
 
 ```
 Tournament Mode Selection
-    → JSON Config Loading
+    → JSON Config Loading (already built)
         → Round Prep / Player-to-Cabinet Assignment
             → Gameplay Scene Setup (SP/DP)
                 → OBS Scene Switching
@@ -77,29 +77,86 @@ Game State Detection Integration
                             → Configurable Timing Delays
 ```
 
-**Critical path for MVP:**
-1. Tournament Mode Selection + JSON Config Loading
-2. Round Prep / Player-to-Cabinet Assignment
-3. Multi-Cabinet Monitoring + Game State Detection
-4. AI-Assisted Auto-Switching (Live ↔ Gameplay)
-5. Score OCR + Review UI
-6. Scoreboard Push + configurable delays
+### Dependency Notes
+
+- **Round Prep requires JSON Config Loading:** Teams, schedules, and player lists come from validated config files (`data/teams.json`, `team_schedule.json`, `individual_schedule.json`). Config loader is already built.
+- **Gameplay Scene Setup requires Round Prep:** SP/DP team match scenes need to know which cabinets are active and which players are assigned.
+- **AI-Assisted Auto-Switching requires Multi-Cabinet Monitoring + Game State Detection:** The automation loop polls each cabinet via `obs_manager.py` and feeds labels into `iidx_state_machine`.
+- **Score Review UI requires Score OCR Integration:** Scores are only captured when the state machine enters the `score` state; the UI cannot review what has not been captured.
+- **Scoreboard Push requires Score Review UI:** Scores must be operator-confirmed before broadcast to prevent AI misreads from going live.
+- **Configurable Timing Delays affect Auto-Switching and Scoreboard Push:** Delays control the timing of transitions (e.g., 5s before push, 15s before returning to Live).
 
 ---
 
-## MVP Recommendation
+## MVP Definition
 
-**Prioritize:**
-1. **OBS Scene Switching** — foundation everything else builds on
-2. **Multi-Cabinet Monitoring + State Detection** — enables automation
-3. **Round Prep / Player-to-Cabinet Assignment** — required before every round
-4. **Score Review & Correction UI** — operator trust depends on this
-5. **Scoreboard Push Integration** — delivers end-to-end value
+### Launch With (v1.2)
 
-**Defer:**
-- **Live State Visualization**: Nice to have, but operator can infer state from video
-- **One-Click Score Correction**: Start with editable text fields; +/- shortcuts can be added later
-- **Round-Aware Context Preloading**: Can be done manually in early versions
+Minimum viable product for the Auto-Director Core milestone.
+
+- [ ] **Tournament Mode Selection + JSON Config Loading** — already built; wire into UI
+- [ ] **Round Prep / Player-to-Cabinet Assignment** — required before every round
+- [ ] **Multi-Cabinet Monitoring + Game State Detection** — enables automation
+- [ ] **AI-Assisted Auto-Switching (Live ↔ Gameplay)** — core value proposition
+- [ ] **Score OCR + Review UI** — operator trust depends on this
+- [ ] **Scoreboard Push Integration** — delivers end-to-end value
+- [ ] **Configurable Timing Delays** — required for flexible pacing
+
+### Add After Validation (v1.2.x)
+
+Features to add once core is working.
+
+- [ ] **Live State Visualization** — operator can infer state from video in early versions
+- [ ] **One-Click Score Correction** — start with editable text fields; +/- shortcuts can be added later
+- [ ] **Delay Override on the Fly** — manual advance button and pause/resume
+
+### Future Consideration (v1.3+)
+
+Features to defer until product-market fit is established.
+
+- [ ] **Round-Aware Context Preloading** — can be done manually in early versions
+- [ ] **Scoreboard_game / Scoreboard_web dedicated scenes** — OBS scenes to be added manually later
+
+---
+
+## Feature Prioritization Matrix
+
+| Feature | User Value | Implementation Cost | Priority |
+|---------|------------|---------------------|----------|
+| OBS Scene Switching | HIGH | LOW | P1 |
+| Multi-Cabinet Monitoring (4x) | HIGH | MEDIUM | P1 |
+| Game State Detection Integration | HIGH | LOW | P1 |
+| Score OCR Integration | HIGH | LOW | P1 |
+| Score Review & Correction UI | HIGH | MEDIUM | P1 |
+| Tournament Mode Selection | HIGH | LOW | P1 |
+| JSON Config Loading | HIGH | LOW | P1 (already built) |
+| Round Prep / Player-to-Cabinet Assignment | HIGH | MEDIUM | P1 |
+| Gameplay Scene Setup (SP/DP) | HIGH | MEDIUM | P1 |
+| Scoreboard Push Integration | HIGH | LOW | P1 |
+| Configurable Timing Delays | MEDIUM | LOW | P1 |
+| AI-Assisted Auto-Switching | HIGH | MEDIUM | P1 |
+| Unified Single-Web-App Control Panel | HIGH | MEDIUM | P1 |
+| Live State Visualization | MEDIUM | MEDIUM | P2 |
+| One-Click Score Correction | MEDIUM | LOW | P2 |
+| Delay Override on the Fly | MEDIUM | LOW | P2 |
+| Round-Aware Context Preloading | MEDIUM | MEDIUM | P3 |
+
+**Priority key:**
+- P1: Must have for launch
+- P2: Should have, add when possible
+- P3: Nice to have, future consideration
+
+---
+
+## Competitor Feature Analysis
+
+| Feature | Manual OBS + Chat | tpl_scene_switcher | Our Approach |
+|---------|-------------------|--------------------|--------------|
+| Scene switching | Operator manually clicks OBS | Serial-triggered scripted switching | AI-driven + operator override via web UI |
+| Cabinet monitoring | Watch 4 video feeds in OBS | Not supported | Unified web panel with per-cabinet state labels |
+| Score entry | Read screen, type into scoreboard | Not supported | AI OCR + operator review + one-click confirm |
+| Round setup | Edit text sources by hand | Hardcoded in Python script | Web UI loads JSON config and assigns players to cabinets |
+| Delay control | None | Fixed sleep delays | Configurable per-transition, including manual pause |
 
 ---
 
@@ -111,3 +168,7 @@ Game State Detection Integration
 - `/home/matryoshka/Downloads/out_frames/iidx_state_machine/state_machine.py` and `state_machine.yaml` — state tracking and transitions
 - `/home/matryoshka/Downloads/out_frames/iidx_bpl_scoreboard/PROTOCOL.md` — BPL scoreboard WebSocket protocol
 - `/home/matryoshka/Downloads/out_frames/iidx_knockout_scoreboard/.planning/REQUIREMENTS.md` — knockout scoreboard requirements and out-of-scope decisions
+
+---
+*Feature research for: IIDX Tournament Auto-Director*
+*Researched: 2026-04-15*

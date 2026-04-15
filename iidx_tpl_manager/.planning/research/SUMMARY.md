@@ -1,7 +1,8 @@
 # Research Summary
 
 **Project:** IIDX Tournament Auto-Director  
-**Date:** 2026-04-14
+**Milestone:** v1.2 Auto-Director Core  
+**Date:** 2026-04-15
 
 ---
 
@@ -47,13 +48,10 @@
 
 Build a monolithic Flask app with a central `TournamentDirector` controller, background polling thread for 4-cabinet recognition, and SocketIO for real-time UI updates. Keep all scene-switching decisions server-side.
 
-## Recommended Build Order
+## Suggested Build Order
 
-1. ConfigLoader + TournamentDirector shell
-2. RoundManager + Round Prep UI
-3. OBSClient + manual scene switching
-4. Polling Thread + Live Monitor UI
-5. SceneAutomator automation rules
-6. ScoreManager + Score Review UI
-7. Scoreboard clients + push integration
-8. Configurable delays + override controls
+1. OBS Client + Scene Controller — validates OBS WebSocket connectivity
+2. Round Prep UI + Runtime State Extension — enables operator match setup
+3. Cabinet Worker + Live Monitor UI — brings real-time cabinet state to browser
+4. Scoreboard Client + Score Review UI — closes human-in-the-loop confirmation flow
+5. Auto-Transition Rules + Configurable Delays — cross-cutting polish; lowest dependency risk

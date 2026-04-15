@@ -1,8 +1,8 @@
-# Architecture Patterns
+# Architecture Patterns: IIDX Tournament Auto-Director Core
 
-**Domain:** Python web-based OBS tournament director for beatmania IIDX
-**Researched:** 2026-04-14
-**Confidence:** HIGH (derived from direct analysis of existing codebase components, protocols, and operator workflows)
+**Domain:** Local web-based OBS director for arcade tournament streaming  
+**Researched:** 2026-04-15  
+**Confidence:** HIGH
 
 ---
 
@@ -12,43 +12,37 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Web UI Layer (Flask + SocketIO)                      │
+│                         Operator UI (Browser)                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │  Mode Select │  │  Round Prep  │  │ Live Monitor │  │ Score Review │    │
-│  │    Page      │  │    Page      │  │    Page      │  │    Page      │    │
+│  │ Mode Select  │  │ Round Prep   │  │ Cabinet Grid │  │ Score Review │    │
 │  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘    │
 │         │                 │                 │                 │             │
 │         └─────────────────┴─────────────────┴─────────────────┘             │
-│                                    ↓                                        │
-│                         ┌────────────────────┐                              │
-│                         │   SocketIO Events  │  ← Real-time push to browser │
-│                         └────────────────────┘                              │
+│                                   ↑↓ SocketIO                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                         Application Layer (Python)                           │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                    Tournament Director Controller                    │    │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │    │
-│  │  │ ConfigLoader│  │ RoundManager│  │SceneAutomator│  │ScoreManager│ │    │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-│                                    ↓                                        │
-│  ┌─────────────────────────────────────────────────────────────────────┐    │
-│  │                    Polling / Background Thread                       │    │
-│  │         (obs_manager.process_frame loop for 4 cabinets)              │    │
-│  └─────────────────────────────────────────────────────────────────────┘    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                         External Integration Layer                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │   OBS Studio │  │iidx_state_   │  │iidx_score_   │  │ Scoreboards  │    │
-│  │  (WebSocket) │  │   reco       │  │   reco       │  │ (WebSocket)  │    │
-│  │   Port 4455  │  │  Port 9876   │  │  Port 9877   │  │ 8080 / 8081  │    │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘    │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                         Data / Config Layer                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                       │
-│  │  teams.json  │  │team_schedule.│  │individual_   │                       │
-│  │              │  │    json      │  │schedule.json │                       │
-│  └──────────────┘  └──────────────┘  └──────────────┘                       │
+│                      Flask App (port 5002, threaded)                         │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │ HTTP Routes │  │ SocketIO    │  │ Runtime     │  │ Background Worker   │ │
+│  │ (Jinja2)    │  │ Handlers    │  │ State       │  │ (cabinet polling)   │ │
+│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘ │
+│         │                │                │                    │            │
+├─────────┴────────────────┴────────────────┴────────────────────┴────────────┤
+│                         Integration & Control Layer                          │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────────┐   │
+│  │ OBSManager      │  │ Scoreboard      │  │ Scene Controller            │   │
+│  │ (obs_manager.py)│  │ WebSocket Client│  │ (transitions + source ctrl) │   │
+│  └────────┬────────┘  └────────┬────────┘  └──────────────┬──────────────┘   │
+│           │                    │                          │                  │
+├───────────┴────────────────────┴──────────────────────────┴──────────────────┤
+│                         External Services (existing)                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐ │
+│  │ OBS Studio   │  │ State Reco   │  │ Score Reco   │  │ State Machine    │ │
+│  │ WebSocket v5 │  │ TCP :9876    │  │ TCP :9877    │  │ (iidx_state_mach)│ │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────────┘ │
+│  ┌──────────────┐  ┌──────────────┐                                          │
+│  │ BPL Board    │  │ Knockout     │                                          │
+│  │ WS :8080     │  │ WS :8081     │                                          │
+│  └──────────────┘  └──────────────┘                                          │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,251 +50,266 @@
 
 | Component | Responsibility | Communicates With |
 |-----------|---------------|-------------------|
-| **Web UI Layer** | Operator-facing pages: mode selection, round prep, live monitoring, score review | Tournament Director Controller via HTTP and SocketIO events |
-| **Tournament Director Controller** | Central orchestrator holding current tournament mode, active round, and global state | All sub-managers and the polling thread |
-| **ConfigLoader** | Parse and validate `teams.json`, `team_schedule.json`, `individual_schedule.json` | Tournament Director Controller |
-| **RoundManager** | Track current round, player-to-cabinet assignments, match metadata | Tournament Director Controller, SceneAutomator, ScoreManager |
-| **SceneAutomator** | Decide when to switch OBS scenes and configure gameplay scene sources/groups | Tournament Director Controller, OBS WebSocket, Polling Thread |
-| **ScoreManager** | Collect OCR scores, present for review, and push confirmed scores to scoreboards | Tournament Director Controller, Score Review UI, Scoreboard WebSockets |
-| **Polling Thread** | Continuously call `obs_manager.process_frame()` for all 4 cabinets | `obs_manager.py` library, feeds events back to SceneAutomator and ScoreManager |
-| **obs_manager.py** (reused) | Capture frames from OBS, send to state/score recognition TCP services | OBS WebSocket, `iidx_state_reco`, `iidx_score_reco`, `iidx_state_machine` |
+| `HTTP Routes` | Serve Jinja2 pages (status, mode select, round prep, score review) | Runtime State, Config Loader |
+| `SocketIO Handlers` | Push real-time cabinet states, scores, scene changes to UI; receive operator commands | Background Worker, Scene Controller, Scoreboard Client |
+| `Runtime State` | Persist current tournament mode, round assignments, config paths, and review queue | HTTP Routes, SocketIO, Background Worker |
+| `Background Worker` | Poll 4 cabinets via `OBSManager` on a timer; feed frames to state machine and score OCR | OBSManager, SocketIO (broadcast results) |
+| `OBSManager` | Capture source screenshots, send to TCP inference services, track per-machine config | Background Worker, Scene Controller |
+| `Scene Controller` | Switch OBS scenes, toggle group visibility, update text sources for gameplay overlays | SocketIO handlers (operator override), Background Worker (auto transitions) |
+| `Scoreboard Client` | Forward confirmed scores to BPL (:8080) or knockout (:8081) WebSocket relays | SocketIO handlers (on operator confirm) |
 
 ---
 
-## Data Flow
-
-### 1. Setup Flow (Before Broadcast)
+## Recommended Project Structure
 
 ```
-Operator selects tournament mode
-         ↓
-ConfigLoader reads appropriate JSON(s)
-         ↓
-Tournament Director Controller initializes mode state
-         ↓
-Operator proceeds to Round Prep
-         ↓
-RoundManager stores player → cabinet mapping
-         ↓
-SceneAutomator pre-configures gameplay scene text/groups
-         ↓
-OBS scene is ready for the round
-```
-
-### 2. Live Game Flow (Auto-Director Loop)
-
-```
-Polling Thread (every ~1s)
-    ├── Cabinet 1: capture frame → state reco → state machine
-    ├── Cabinet 2: capture frame → state reco → state machine
-    ├── Cabinet 3: capture frame → state reco → state machine
-    └── Cabinet 4: capture frame → state reco → state machine
-                ↓
-    State changes emitted via SocketIO to Live Monitor page
-                ↓
-    SceneAutomator evaluates aggregate state across 4 cabinets
-                ↓
-    If transition condition met:
-        ├── Switch OBS scene (Live ↔ Gameplay ↔ Scoreboard_game)
-        └── Emit transition event to Web UI
-                ↓
-    If any cabinet enters `score` state with valid scores:
-        ├── ScoreManager receives OCR results
-        ├── Scores displayed in Score Review UI
-        └── Operator edits / confirms
-                ↓
-    On operator confirmation:
-        ├── SceneAutomator switches to Scoreboard_web
-        ├── Delay N seconds (configurable)
-        ├── ScoreManager pushes score to active scoreboard (8080 or 8081)
-        ├── Delay M seconds (configurable)
-        └── SceneAutomator switches back to Live camera
-```
-
-### 3. Scoreboard Push Flow
-
-```
-Operator confirms scores in Web UI
-         ↓
-ScoreManager formats payload based on active mode
-         ↓
-    If Team Mode:
-        └── WebSocket message to BPL scoreboard (port 8080)
-                { "cmd": "score", "data": { "round": N, "leftScore": X, "rightScore": Y } }
-    If Individual Mode:
-        └── WebSocket message to Knockout scoreboard (port 8081)
-                { "cmd": "score", "data": { "stage": "...", "group": "...", "round": N, "scores": [...] } }
-         ↓
-Scoreboard browser source updates on screen
-```
-
----
-
-## Suggested Project Structure
-
-```
-iidx_tpl_manager/
-├── app.py                      # Flask + SocketIO application entry point
-├── config.py                   # App-level configuration (ports, defaults)
-├── data/                       # JSON tournament configs (gitignored or tracked)
-│   ├── teams.json
-│   ├── team_schedule.json
-│   └── individual_schedule.json
-├── src/
+src/
+├── app.py                 # Flask factory + SocketIO initialization
+├── state.py               # RuntimeState dataclass + persistence
+├── config/
 │   ├── __init__.py
-│   ├── controller/
-│   │   ├── __init__.py
-│   │   └── director.py         # TournamentDirector central orchestrator
-│   ├── config_loader/
-│   │   ├── __init__.py
-│   │   └── loader.py           # JSON parsing and validation
-│   ├── round_manager/
-│   │   ├── __init__.py
-│   │   └── round_manager.py    # Round and cabinet assignment state
-│   ├── scene_automator/
-│   │   ├── __init__.py
-│   │   └── automator.py        # OBS scene switching and source setup
-│   ├── score_manager/
-│   │   ├── __init__.py
-│   │   └── score_manager.py    # Score review buffer and scoreboard push
-│   ├── obs_client/
-│   │   ├── __init__.py
-│   │   └── obs_client.py       # Thin wrapper around obs_manager.py + switcher.py logic
-│   └── scoreboard_client/
-│       ├── __init__.py
-│       ├── bpl_client.py       # WebSocket client for port 8080
-│       └── knockout_client.py  # WebSocket client for port 8081
-├── static/
-│   ├── css/
-│   └── js/
-│       └── monitor.js          # SocketIO client for live updates
+│   ├── loader.py          # JSON load/validate + template generation
+│   └── models.py          # Pydantic schemas
+├── obs/
+│   ├── __init__.py
+│   ├── client.py          # Thin wrapper around obsws-python (connect, scene switch, source text)
+│   └── scene_controller.py# Higher-level: transition sequences, group visibility, delays
+├── cabinets/
+│   ├── __init__.py
+│   ├── worker.py          # Background thread: poll 4 machines, emit SocketIO events
+│   └── mapper.py          # Round-to-cabinet assignment logic
+├── scoreboard/
+│   ├── __init__.py
+│   └── client.py          # Async websockets client for :8080 / :8081
 ├── templates/
 │   ├── base.html
+│   ├── status.html
 │   ├── mode_select.html
 │   ├── round_prep.html
-│   ├── live_monitor.html
 │   └── score_review.html
-├── tests/
-│   └── ...
-└── requirements.txt
+└── static/
+    ├── css/
+    │   └── main.css
+    └── js/
+        └── operator.js    # SocketIO client for real-time updates
 ```
 
 ### Structure Rationale
 
-- **`src/controller/`:** Single source of truth for tournament state. Prevents scattered global variables.
-- **`src/config_loader/`:** Isolates JSON schema knowledge. Easy to add validation later.
-- **`src/round_manager/`:** Player-to-cabinet mapping changes every round. Keeping it separate makes round transitions explicit.
-- **`src/scene_automator/`:** Encapsulates all OBS-side decisions. Mirrors the existing `switcher.py` responsibilities but adds automation logic.
-- **`src/score_manager/`:** Handles the human-in-the-loop score confirmation and the final push. Separates transient review state from round state.
-- **`src/obs_client/`:** Wraps the reused `obs_manager.py` library so the rest of the app does not depend directly on its threading model.
-- **`src/scoreboard_client/`:** Mode-specific protocol implementations. Makes it easy to add new scoreboard types later.
+- **`obs/`:** Isolates OBS-specific protocol details from application logic. `scene_controller.py` owns the transition state machine (Live -> Gameplay -> Scoreboard_game -> Scoreboard_web -> Live).
+- **`cabinets/`:** Owns the frame-polling loop and per-round cabinet mapping. Keeps `app.py` free of threading details.
+- **`scoreboard/`:** Wraps the two external WebSocket relays so the rest of the app sends a single `push_score()` call without caring about port differences.
+- **`templates/` + `static/js/`:** Server-rendered HTML keeps initial load simple; `operator.js` handles SocketIO reconnection and DOM updates for cabinet grids/score cards.
 
 ---
 
 ## Patterns to Follow
 
-### Pattern 1: Background Thread + SocketIO for Real-Time Push
-
-**What:** Run the 4-cabinet polling loop in a background thread. Emit state and score events via Flask-SocketIO so the browser updates without polling.
-
-**When to use:** Any time the server produces events faster than the user requests them (frame recognition, scene transitions, score arrival).
-
-**Trade-offs:** Keeps UI responsive and enables live dashboards, but requires thread-safe access to shared state.
+### Pattern 1: Background Worker Thread with SocketIO Broadcast
+**What:** A daemon thread runs the `OBSManager` polling loop and emits SocketIO events from a thread-safe wrapper.
+**When:** You need continuous frame capture without blocking Flask's request handlers.
+**Trade-offs:** Adds thread-safety concerns, but Flask-SocketIO handles cross-thread emission via `socketio.emit(..., namespace='/', broadcast=True)` when using an external message queue or the built-in in-memory queue with threading/async modes.
 
 **Example:**
 ```python
-from flask import Flask
-from flask_socketio import SocketIO
+# src/cabinets/worker.py
 import threading
+import time
+from flask_socketio import SocketIO
 
-app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+class CabinetWorker:
+    def __init__(self, socketio: SocketIO, obs_manager, interval: float = 1.0):
+        self.socketio = socketio
+        self.obs_manager = obs_manager
+        self.interval = interval
+        self._thread = None
+        self._stop = threading.Event()
 
-def polling_loop(director):
-    while True:
-        results = director.poll_all_machines()
-        socketio.emit("machine_update", results)
-        socketio.sleep(1.0)
+    def start(self):
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
-@socketio.on("start_monitoring")
-def handle_start_monitoring():
-    threading.Thread(target=polling_loop, args=(director,), daemon=True).start()
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+
+    def _run(self):
+        while not self._stop.is_set():
+            for machine_id in self.obs_manager.machines:
+                result = self.obs_manager.process_frame(machine_id)
+                self.socketio.emit("cabinet_update", result)
+            self._stop.wait(self.interval)
 ```
 
-### Pattern 2: State Machine Observer for Scene Transitions
+### Pattern 2: Scene Controller as a State Machine
+**What:** Encapsulate OBS scene transitions in a small state machine with configurable delays.
+**When:** Transitions have fixed sequences (Live ↔ Gameplay ↔ Scoreboard) and operator overrides.
+**Trade-offs:** Prevents scattered `set_current_program_scene` calls across handlers; makes delay logic testable.
 
-**What:** Treat `iidx_state_machine` outputs as events. A small observer inside `SceneAutomator` maps aggregate cabinet states to scene decisions.
-
-**When to use:** When multiple independent inputs (4 cabinets) must be reduced to a single broadcast decision.
-
-**Trade-offs:** Centralizes transition logic, but the observer must handle edge cases (e.g., 2 cabinets in `play`, 2 in `score`).
-
-**Example transition rules:**
-- Any cabinet transitions `live` → `play`: switch to gameplay scene.
-- All cabinets in `score` or `blank`: switch to `Scoreboard_game` (intermediate result scene).
-- Operator confirms scores: switch to `Scoreboard_web`, then push, then return to `现场摄像`.
-
-### Pattern 3: Human-in-the-Loop Score Buffer
-
-**What:** `ScoreManager` holds unconfirmed scores in memory. The Web UI renders them with editable fields. Only on explicit confirmation does the score leave the buffer and travel to the scoreboard.
-
-**When to use:** AI OCR is imperfect and operator trust is critical.
-
-**Trade-offs:** Adds one step to the flow, but prevents on-air errors.
-
-**Example data structure:**
+**Example:**
 ```python
+# src/obs/scene_controller.py
+from enum import Enum, auto
+
+class SceneState(Enum):
+    LIVE = auto()
+    GAMEPLAY = auto()
+    SCOREBOARD_GAME = auto()
+    SCOREBOARD_WEB = auto()
+
+class SceneController:
+    def __init__(self, obs_client):
+        self.obs = obs_client
+        self.state = SceneState.LIVE
+        self.delays = {"scoreboard_game": 0, "scoreboard_web": 5, "return_live": 15}
+
+    def to_gameplay(self, mode: str):
+        scene = {"team": "SP团队赛", "dp_team": "DP团队赛", "individual": "个人赛"}.get(mode)
+        self.obs.set_scene(scene)
+        self.state = SceneState.GAMEPLAY
+
+    def to_scoreboard_game(self):
+        self.obs.set_scene("Scoreboard_game")
+        self.state = SceneState.SCOREBOARD_GAME
+
+    def confirm_and_to_web(self):
+        # called after operator confirms score
+        self.obs.set_scene("Scoreboard_web")
+        self.state = SceneState.SCOREBOARD_WEB
+```
+
+### Pattern 3: Score Review Queue
+**What:** A small in-memory queue holds AI-recognized scores until the operator confirms or edits them.
+**When:** You need a human-in-the-loop gate before pushing to public scoreboards.
+**Trade-offs:** In-memory is fine for a single-operator local app; no database needed. Persist to `RuntimeState` if you want recovery across restarts.
+
+**Example:**
+```python
+# src/state.py
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+
 @dataclass
-class PendingScore:
+class ScoreReviewItem:
     machine_id: str
-    round: int
     raw_scores: dict
-    confirmed_scores: Optional[dict] = None
+    edited_scores: Optional[dict] = None
     confirmed: bool = False
+
+@dataclass
+class RuntimeState:
+    config_paths: Dict[str, str] = field(default_factory=dict)
+    loaded_at: Optional[str] = None
+    mode: Optional[str] = None           # "team" | "individual"
+    round_assignments: Dict[str, str] = field(default_factory=dict)  # player_id -> machine_id
+    review_queue: List[ScoreReviewItem] = field(default_factory=list)
 ```
 
 ---
 
-## Anti-Patterns to Avoid
+## Data Flow
 
-### Anti-Pattern 1: Direct WebSocket Calls from the Polling Thread
+### 1. Round Preparation Flow
+```
+Operator selects mode + loads config
+         ↓
+HTTP POST /setup_round
+         ↓
+Update RuntimeState (mode, assignments)
+         ↓
+SceneController.to_gameplay(mode)
+         ↓
+SocketIO emit "round_ready" -> UI shows cabinet mapping
+```
 
-**What:** Calling OBS WebSocket or scoreboard WebSocket directly from the background polling thread without going through the controller.
+### 2. Cabinet Monitoring Flow
+```
+Background Worker (1s interval)
+         ↓
+OBSManager.capture_and_recognize() per machine
+         ↓
+State machine processes label -> may trigger "get_score"
+         ↓
+OBSManager.capture_and_recognize_score() on score state
+         ↓
+SocketIO emit "cabinet_update" -> UI updates per-cabinet card
+         ↓
+If scores detected and valid -> append to RuntimeState.review_queue
+         ↓
+SocketIO emit "score_pending" -> UI highlights review panel
+```
 
-**Why bad:** Creates race conditions, makes transitions hard to trace, and complicates testing.
+### 3. Score Review & Confirm Flow
+```
+Operator edits/confirms score in UI
+         ↓
+SocketIO event "confirm_score" with edited payload
+         ↓
+Update RuntimeState.review_queue item as confirmed
+         ↓
+SceneController.to_scoreboard_web() (Transition 3)
+         ↓
+delay(delays["scoreboard_web"])
+         ↓
+ScoreboardClient.push_score(mode, payload)
+         ↓
+delay(delays["return_live"])
+         ↓
+SceneController.to_live()
+         ↓
+SocketIO emit "score_published" -> UI returns to standby
+```
 
-**Instead:** Polling thread emits events into a thread-safe queue or calls controller methods protected by locks. The controller decides when to act on external services.
-
-### Anti-Pattern 2: Storing OBS Scene Logic in the Frontend
-
-**What:** Having JavaScript decide when to switch scenes by calling a backend endpoint.
-
-**Why bad:** The browser is not the source of truth for game state. A refresh or network hiccup breaks automation.
-
-**Instead:** `SceneAutomator` runs entirely server-side. The frontend is read-only for state and write-only for operator overrides (confirm score, force scene, adjust delays).
-
-### Anti-Pattern 3: Tight Coupling to `obs_manager.py` Internals
-
-**What:** Scattering `OBSManager` instantiation and `process_frame` calls across multiple route handlers.
-
-**Why bad:** `obs_manager.py` may change its API or threading model. Also makes it hard to mock for tests.
-
-**Instead:** Wrap `obs_manager.py` in a thin `OBSClient` class with a stable interface. The rest of the app depends only on `OBSClient`.
+### 4. Auto-Transition Flow (Transitions 1, 2, 4)
+```
+State machine reports state change (e.g., "play")
+         ↓
+Background Worker detects transition condition
+         ↓
+SceneController.to_gameplay() or to_scoreboard_game() or to_live()
+         ↓
+SocketIO emit "scene_changed" -> UI shows current scene
+```
 
 ---
 
 ## Scalability Considerations
 
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 1 operator, 1 stream | Monolithic Flask app is fine. Run everything on the streaming PC. |
-| Multiple concurrent tournaments | Would require splitting the polling thread per event and running separate app instances. Not needed per scope. |
-| Higher frame rates | If 1s polling feels sluggish, move to per-cabinet threads with independent intervals, but watch CPU usage from 4x OBS screenshots + inference. |
+| Scale | Adjustment |
+|-------|------------|
+| 1 operator, 4 cabinets, local LAN | Current architecture is ideal. Threaded Flask + 1 background thread is sufficient. |
+| Multiple operators | Would need session/auth separation and a proper message broker (Redis) for SocketIO. Not required. |
+| Remote OBS / cloud inference | Would need async HTTP bridges and retry logic. Out of scope. |
 
-### Scaling Priorities
+### What Breaks First
 
-1. **First bottleneck:** OBS screenshot latency at high resolution (1920x1080 for score capture). Mitigate by capturing state frames at 224x224 and only capturing full-resolution score frames when the state machine requests them.
-2. **Second bottleneck:** TCP inference services under rapid polling. Mitigate by keeping the 1s interval or batching frames if services support it.
+1. **Frame capture latency** — `get_source_screenshot` over OBS WebSocket can be slow. Mitigation: lower screenshot quality/resize, or run inference services on the same machine.
+2. **SocketIO message backlog** — If the operator UI disconnects/reconnects rapidly, queued events may flood the client. Mitigation: emit only diffs, not full frames.
+
+---
+
+## Anti-Patterns to Avoid
+
+### Anti-Pattern 1: Calling OBS WebSocket from HTTP Request Threads
+**What:** Synchronous OBS calls inside Flask route handlers.
+**Why bad:** `get_source_screenshot` can take 200-500ms; this blocks the Werkzeug worker and stalls the UI.
+**Instead:** Route all OBS interactions through the background worker or a dedicated thread pool.
+
+### Anti-Pattern 2: Leaking Scoreboard Protocols into Route Handlers
+**What:** Hardcoding BPL/knockout message shapes inside `app.py`.
+**Why bad:** The two scoreboards have different command schemas (`cmd: score` vs `cmd: settle`). Mixing them creates fragile, untestable code.
+**Instead:** Encapsulate protocol translation in `scoreboard/client.py` with a mode-aware `push_score()` method.
+
+### Anti-Pattern 3: Storing OBS Connection State in Global Variables
+**What:** `obs_client = None` at module level, mutated by routes.
+**Why bad:** Race conditions across threads; hard to test; unclear lifecycle.
+**Instead:** Attach the `OBSManager` and `SceneController` to the Flask app context or a small registry object passed to handlers.
+
+### Anti-Pattern 4: Polling Cabinets from the Main Thread
+**What:** Running `while True: process_frame()` directly in `app.py` before `socketio.run()`.
+**Why bad:** Blocks Flask-SocketIO's event loop and prevents the server from starting.
+**Instead:** Start the background worker after `socketio.run()` begins, or use Flask's `before_first_request` / `@socketio.on('connect')` trigger with a singleton guard.
 
 ---
 
@@ -308,48 +317,62 @@ class PendingScore:
 
 ### External Services
 
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| OBS Studio (4455) | WebSocket request/response + event subscription | Use `obsws-python` (already used in `obs_manager.py`). Scene switching is synchronous; source updates are synchronous. |
-| `iidx_state_reco` (9876) | TCP socket, 4-byte length prefix + JPEG bytes | Stateless per-frame inference. Already wrapped in `obs_manager.py`. |
-| `iidx_score_reco` (9877) | TCP socket, 4-byte length prefix + PNG bytes | Returns JSON with ROI scores and validity flags. Already wrapped in `obs_manager.py`. |
-| `iidx_state_machine` | In-process Python import | `obs_manager.py` lazily imports `IIDXStateMachineManager`. State is held in memory. |
-| BPL Scoreboard (8080) | WebSocket JSON messages | Init on round load, score on confirmation. Fire-and-forget with optional ack logging. |
-| Knockout Scoreboard (8081) | WebSocket JSON messages | Init on tournament start, score per group round, continue on group advance. |
+| Service | Pattern | Notes |
+|---------|---------|-------|
+| OBS Studio (WebSocket v5) | Synchronous `obsws.ReqClient` wrapped in `obs/client.py` | Keep connection alive; reconnect on `ConnectionError`. Scene names are Chinese strings configured in OBS. |
+| State Reco (TCP :9876) | Called inside `obs_manager.py` via `socket.sendall` | Already wrapped; no changes needed. |
+| Score Reco (TCP :9877) | Called inside `obs_manager.py` via `socket.sendall` | Returns JSON with `1p_valid` / `2p_valid` flags. |
+| State Machine | Imported lazily by `obs_manager.py`; `process_event()` drives transitions | Must be initialized with a YAML config path. |
+| BPL Scoreboard (WS :8080) | `websockets` async client | Simple broadcast relay; connect, send JSON, disconnect (or keep open). |
+| Knockout Scoreboard (WS :8081) | `websockets` async client | Same relay pattern; command schema differs slightly. |
 
 ### Internal Boundaries
 
 | Boundary | Communication | Notes |
 |----------|---------------|-------|
-| Web UI ↔ Controller | HTTP + SocketIO events | Keep payloads small (state labels, score dicts). |
-| Controller ↔ SceneAutomator | Direct method calls | SceneAutomator should be idempotent (calling "set gameplay scene" twice is safe). |
-| Controller ↔ ScoreManager | Direct method calls + in-memory buffer | ScoreManager exposes `submit_for_review()`, `confirm_score()`, `push_to_scoreboard()`. |
-| Controller ↔ Polling Thread | Thread-safe queue or locked shared state | Use `threading.Lock` or `queue.Queue` to pass frame results. |
-| Polling Thread ↔ obs_manager.py | Direct method calls | `obs_manager.py` is not thread-safe by design; only the polling thread should use it. |
+| `HTTP Routes ↔ Runtime State` | Direct function calls | Small, synchronous reads/writes. |
+| `Background Worker ↔ SocketIO` | `socketio.emit()` | Use `socketio.emit(..., namespace='/')` from the worker thread. |
+| `SocketIO Handlers ↔ Scene Controller` | Direct method calls | Scene switches are fast enough to run in the SocketIO handler thread. |
+| `SocketIO Handlers ↔ Scoreboard Client` | Direct method calls | May use `asyncio.run_coroutine_threadsafe()` if the scoreboard client is async and the handler is sync. |
 
 ---
 
-## Build Order Implications
+## Suggested Build Order
 
-Based on component dependencies, the recommended implementation order is:
+1. **`obs/client.py` + `obs/scene_controller.py`**
+   - Lowest dependency; only needs `obsws-python`.
+   - Prove scene switching and source text updates work from a test script.
 
-1. **ConfigLoader + TournamentDirector shell** — No external dependencies. Establishes the data model.
-2. **RoundManager + Round Prep UI** — Depends on ConfigLoader. Enables operator workflow for match setup.
-3. **OBSClient wrapper + SceneAutomator (manual switching)** — Depends on OBS WebSocket. Allows operator to cut scenes from the web UI even before automation exists.
-4. **Polling Thread + Live Monitor UI** — Depends on OBSClient. Brings in `obs_manager.py`, state reco, and state machine. Enables live state visualization.
-5. **SceneAutomator automation rules** — Depends on Polling Thread output. Adds the auto-switching logic.
-6. **ScoreManager + Score Review UI** — Depends on Polling Thread score capture. Adds human review.
-7. **Scoreboard clients + push integration** — Depends on ScoreManager. Closes the end-to-end loop.
-8. **Configurable delays + override controls** — Cross-cutting UI and automator logic. Polish feature.
+2. **`cabinets/mapper.py` + extend `RuntimeState`**
+   - Add `mode`, `round_assignments`, and `review_queue` to `state.py`.
+   - Build round-prep HTML form and POST handler.
+
+3. **`cabinets/worker.py`**
+   - Integrate `obs_manager.py` as a library.
+   - Start/stop the polling thread safely.
+   - Emit `cabinet_update` events to a test UI.
+
+4. **`scoreboard/client.py`**
+   - Implement mode-aware `push_score()`.
+   - Validate against existing BPL and knockout `server.py` relays.
+
+5. **Score review UI + SocketIO handlers**
+   - Build `score_review.html` with editable score cards.
+   - Wire "confirm" to trigger Transition 3 and scoreboard push.
+   - Add configurable delay inputs (including `-1` for manual advance).
+
+6. **Auto-transition logic**
+   - Map state machine outputs to scene transitions.
+   - Add delay timers and manual override buttons.
 
 ---
 
 ## Sources
 
-- `/home/matryoshka/Downloads/out_frames/iidx_tpl_manager/.planning/PROJECT.md` — requirements and scope
-- `/home/matryoshka/Downloads/out_frames/obs_manager/obs_manager.py` — existing capture/recognition integration patterns
-- `/home/matryoshka/Downloads/out_frames/tpl_scene_switcher/switcher.py` — existing OBS scene switching and group visibility logic
-- `/home/matryoshka/Downloads/out_frames/iidx_state_machine/state_machine.py` — state tracking implementation
-- `/home/matryoshka/Downloads/out_frames/iidx_bpl_scoreboard/README.md` and `PROTOCOL.md` — BPL scoreboard WebSocket protocol
-- `/home/matryoshka/Downloads/out_frames/iidx_knockout_scoreboard/README.md` — knockout scoreboard WebSocket protocol
-- [OBS WebSocket 5.x Protocol Documentation](https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md) — connection handshake, scene transitions, source visibility
+- `src/app.py` — existing Flask factory and SocketIO setup
+- `src/state.py` — existing `RuntimeState` persistence pattern
+- `src/config/loader.py` — config loading and Pydantic validation
+- `../obs_manager/obs_manager.py` — frame capture, inference integration, and state machine coupling
+- `../iidx_bpl_scoreboard/server.py` — WebSocket relay protocol for team mode
+- `../iidx_knockout_scoreboard/server.py` — WebSocket relay protocol for individual mode
+- `CLAUDE.md` (project) — stack recommendations and version compatibility
