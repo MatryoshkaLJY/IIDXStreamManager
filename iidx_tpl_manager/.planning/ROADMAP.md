@@ -19,7 +19,10 @@
   1. Operator can start the application and access the web UI at port 5002
   2. Application loads `teams.json`, `team_schedule.json`, and `individual_schedule.json` from `data/` and reports human-readable validation errors
   3. Runtime state (configs, settings) is persisted to disk and auto-restored on restart
-**Plans**: TBD
+**Plans**: 2 plans
+**Plan list**:
+- [ ] `01-01-PLAN.md` — Pydantic config schemas and loader with auto-template generation
+- [ ] `01-02-PLAN.md` — Flask app shell on port 5002, runtime state persistence, and status UI
 **UI hint**: yes
 
 ### Phase 2: Tournament Setup
@@ -80,7 +83,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Config | 0/0 | Not started | - |
+| 1. Foundation & Config | 2/2 | Planned | - |
 | 2. Tournament Setup | 0/0 | Not started | - |
 | 3. OBS Integration | 0/0 | Not started | - |
 | 4. Live Monitoring | 0/0 | Not started | - |
