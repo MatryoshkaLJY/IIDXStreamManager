@@ -86,8 +86,13 @@ Plan list:
   2. Each cabinet displays its current state label (live, play, score, blank, etc.) in real time
   3. State updates appear in the browser without page refresh via SocketIO
   4. Frame capture and inference run in the background without blocking the Flask UI
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
+
+Plan list:
+- [ ] `05-01-PLAN.md` — Extend RuntimeState with monitor_interval, monitoring_active, and source_names
+- [ ] `05-02-PLAN.md` — Create CabinetMonitor background worker with SocketIO and JSON console logging
+- [ ] `05-03-PLAN.md` — Integrate monitor controls into Flask app, Status page, and operator.js
 
 ### Phase 6: Score Review & Scoreboard Integration
 **Goal**: Operator can review, correct, and confirm scores before pushing to scoreboard
