@@ -9,6 +9,18 @@ A web-based intelligent OBS director for beatmania IIDX tournaments. It replaces
 3. Automatically drives OBS scene transitions for live broadcasts
 4. Feeds confirmed scores into the appropriate scoreboard (team BPL-style or individual knockout)
 
+## Current State
+
+**v1.0 Shipped (2026-04-13):** 16-player knockout tournament scoreboard with vanilla HTML/CSS/JS and a Python WebSocket relay (`iidx_knockout_scoreboard`).
+
+**v1.1 Shipped (2026-04-15):** Knockout scoreboard rule refinements — cumulative raw scoring, E/F semifinal groups, auto-advance active highlighting, tiebreaker logic, and medal styling. Verified with a 6-test jsdom suite.
+
+**In `iidx_tpl_manager` (Auto-Director app):**
+- Config loader with Pydantic validation and template generation (`src/config/`)
+- Flask app shell with SocketIO on port 5002 (`src/app.py`)
+- Runtime state persistence (`src/state.py`)
+- Status page with Jinja2 templates and CSS tokens
+
 ## Problem
 
 Running an IIDX tournament stream currently requires multiple disconnected tools (`obs_manager`, `switcher.py`, separate scoreboard servers) and a lot of manual scene switching. The operator must watch the game, decide when to switch scenes, read scores, and update scoreboards by hand.
@@ -52,20 +64,27 @@ Build a single Python web application (`iidx_tpl_manager`) that unifies monitori
 - *(Future)* `Scoreboard_game` — In-game score result screen
 - *(Future)* `Scoreboard_web` — Web scoreboard browser source
 
+## Next Milestone Goals
+
+- Operator UI for tournament mode selection and round-prep player assignments
+- OBS WebSocket integration for programmatic scene switching
+- Cabinet monitoring with `obs_manager.py` and real-time state display
+- Score review workflow with operator confirmation and scoreboard push
+
 ## Requirements
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ 16-player knockout tournament scoreboard — v1.0
+- ✓ Knockout scoreboard rule refinements (cumulative scoring, E/F groups, medals, tiebreaker) — v1.1
+- ✓ Config loader with Pydantic validation and template generation — Phase 01
+- ✓ Flask app shell with SocketIO on port 5002 — Phase 01
+- ✓ Runtime state persistence — Phase 01
 
 ### Active
 
 - [ ] Build a Python web application on port 5002
 - [ ] Support two tournament modes: team match (BPL-style) and individual knockout
-- [ ] Load three types of JSON config files from a `data/` subdirectory:
-  - `teams.json` — team metadata (name, emoji, colors)
-  - `team_schedule.json` — match lineup per round (theme, format 1v1/2v2, players)
-  - `individual_schedule.json` — knockout groups A–D
 - [ ] Provide a web UI for operator to select tournament mode and load config
 - [ ] Provide a round-prep page where operator assigns each player to one of 4 cabinets before each round
 - [ ] Reuse `obs_manager.py` as a library for frame capture and recognition
@@ -90,11 +109,11 @@ Build a single Python web application (`iidx_tpl_manager`) that unifies monitori
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Python + Flask | Operator prefers ease of development over performance; existing stack is Flask-based | — Pending |
-| Port 5002 | Avoids conflict with existing `web_monitor.py` on 5001 | — Pending |
-| Reuse `obs_manager.py` | Avoids duplicating OBS capture and TCP inference logic | — Pending |
-| One mode per event | Simplifies UI and state management | — Pending |
-| Delays configurable including `-1` | Gives operator full control over pacing | — Pending |
+| Python + Flask | Operator prefers ease of development over performance; existing stack is Flask-based | ✓ Good — Phase 01 app shell built successfully |
+| Port 5002 | Avoids conflict with existing `web_monitor.py` on 5001 | ✓ Good — app runs on 5002 as planned |
+| Reuse `obs_manager.py` | Avoids duplicating OBS capture and TCP inference logic | — Pending (next milestone) |
+| One mode per event | Simplifies UI and state management | ✓ Good — keeps config and UI simple |
+| Delays configurable including `-1` | Gives operator full control over pacing | — Pending (next milestone) |
 
 ## Constraints
 
@@ -131,4 +150,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-14 after initialization*
+*Last updated: 2026-04-15 after v1.1 milestone*
