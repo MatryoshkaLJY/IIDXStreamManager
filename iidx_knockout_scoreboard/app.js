@@ -221,11 +221,8 @@ class TournamentApp {
         // Update tournament name
         if (data.tournamentName) {
             this.tournamentState.tournamentName = data.tournamentName;
-            const titleEl = document.querySelector('.tournament-title');
-            if (titleEl) {
-                const titleTextEl = titleEl.querySelector('.title-text');
-                if (titleTextEl) titleTextEl.textContent = data.tournamentName;
-            }
+            const titleTextEl = document.querySelector('.title-text');
+            if (titleTextEl) titleTextEl.textContent = data.tournamentName;
         }
 
         // Initialize quarterfinal groups with player objects
@@ -334,17 +331,14 @@ class TournamentApp {
                 // Store raw score for this round (round is 1-indexed, array is 0-indexed)
                 player.rawScores[round - 1] = rawScore;
 
-                let displayScore;
                 if (stage === 'final') {
                     const finalsState = this.tournamentState.finals;
                     if (finalsState.inTiebreaker) {
                         // Tiebreaker: accumulate tiebreaker score, no points awarded
                         player.tiebreakerScore = (player.tiebreakerScore || 0) + rawScore;
-                        displayScore = player.tiebreakerScore;
                     } else {
-                        // Finals normal round: display current round score only, do not accumulate totalRawScore
-                        player.totalRawScore = 0;
-                        displayScore = rawScore;
+                        // Finals normal round: accumulate total raw score like other stages
+                        player.totalRawScore = (player.totalRawScore || 0) + rawScore;
                         // Add points for this round
                         player.points += points;
                     }
@@ -353,12 +347,11 @@ class TournamentApp {
                     player.totalRawScore = player.rawScores.reduce((sum, s) => sum + (s || 0), 0);
                     // Add points for this round
                     player.points += points;
-                    displayScore = player.totalRawScore;
                 }
 
                 // Update DOM
                 this.updatePlayerNode(group, player.position, {
-                    score: displayScore,
+                    score: player.totalRawScore,
                     points: player.points,
                     rank: rank
                 });
@@ -673,11 +666,8 @@ class TournamentApp {
         this.clearAllPaths();
 
         // Reset tournament name
-        const titleEl = document.querySelector('.tournament-title');
-        if (titleEl) {
-            const titleTextEl = titleEl.querySelector('.title-text');
-            if (titleTextEl) titleTextEl.textContent = '淘汰赛';
-        }
+        const titleTextEl = document.querySelector('.title-text');
+        if (titleTextEl) titleTextEl.textContent = '16人淘汰赛';
 
         // Reset stage indicator
         this.updateStageIndicator('A');
