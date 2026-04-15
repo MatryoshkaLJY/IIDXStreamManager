@@ -435,8 +435,14 @@ class TournamentApp {
                 if (node) node.classList.add('active');
             }
 
+            // Reorder DOM nodes to match sorted order
+            this.reorderGroupNodes(group, sortedPlayers);
+
             // Store advancing players in group state
             groupState.advancing = advancing.map(p => ({ ...p }));
+
+            // Auto-advance to next group
+            this.handleContinue();
 
             // Handle advancement to next stage
             if (stage === 'quarterfinal') {
@@ -520,10 +526,10 @@ class TournamentApp {
                         const player = group[0];
                         const node = this.getPlayerNode('finals', player.position);
                         if (node) {
-                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'second', 'third');
+                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'silver', 'bronze');
                             if (i === 0) node.classList.add('champion');
-                            else if (i === 1) node.classList.add('second');
-                            else if (i === 2) node.classList.add('third');
+                            else if (i === 1) node.classList.add('silver');
+                            else if (i === 2) node.classList.add('bronze');
                             const pointsEl = node.querySelector('.player-points');
                             if (pointsEl) pointsEl.textContent = medals[i] || '';
                         }
@@ -550,10 +556,10 @@ class TournamentApp {
                         const rank = tg.startRank + k;
                         const node = this.getPlayerNode('finals', player.position);
                         if (node) {
-                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'second', 'third');
+                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'silver', 'bronze');
                             if (rank === 0) node.classList.add('champion');
-                            else if (rank === 1) node.classList.add('second');
-                            else if (rank === 2) node.classList.add('third');
+                            else if (rank === 1) node.classList.add('silver');
+                            else if (rank === 2) node.classList.add('bronze');
                             const pointsEl = node.querySelector('.player-points');
                             if (pointsEl) pointsEl.textContent = medals[rank] || '';
                         }
@@ -657,7 +663,7 @@ class TournamentApp {
             });
             const node = this.getPlayerNode('finals', position);
             if (node) {
-                node.classList.remove('champion', 'second', 'third');
+                node.classList.remove('champion', 'silver', 'bronze');
             }
             this.setPlayerState('finals', position, '');
         }
@@ -728,6 +734,27 @@ class TournamentApp {
                 rankEl.textContent = data.rank;
                 rankEl.className = 'player-rank rank-' + data.rank;
             }
+        }
+    }
+
+    /**
+     * Reorder DOM nodes within a group to match sorted player order
+     * @param {string} group - Group name
+     * @param {Array} sortedPlayers - Players in desired display order
+     */
+    reorderGroupNodes(group, sortedPlayers) {
+        const container = document.querySelector('.tournament-tree');
+        if (!container) return;
+
+        const nodes = sortedPlayers.map(p => this.getPlayerNode(group, p.position)).filter(n => n);
+        const label = container.querySelector(`.group-${group.toLowerCase()}-label`);
+
+        if (!label) return;
+
+        // Collect all group nodes and move them after the label in sorted order.
+        // Insert in reverse so the first sorted node ends up first after the label.
+        for (let i = nodes.length - 1; i >= 0; i--) {
+            label.parentNode.insertBefore(nodes[i], label.nextSibling);
         }
     }
 

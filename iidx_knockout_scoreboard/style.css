@@ -290,7 +290,8 @@ html, body {
     }
 }
 
-.player-node.second {
+.player-node.second,
+.player-node.silver {
     background: linear-gradient(135deg,
         rgba(192, 192, 192, 0.2) 0%,
         rgba(255, 255, 255, 0.05) 100%);
@@ -310,7 +311,8 @@ html, body {
     }
 }
 
-.player-node.third {
+.player-node.third,
+.player-node.bronze {
     background: linear-gradient(135deg,
         rgba(205, 127, 50, 0.2) 0%,
         rgba(255, 255, 255, 0.05) 100%);
