@@ -1,7 +1,7 @@
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 
 RUNTIME_STATE_PATH = Path("runtime/state.json")
@@ -27,6 +27,8 @@ class RuntimeState:
         "IIDX#4": "IIDX#4",
     })
     state_machine_config: str = "iidx_state_machine/state_machine.yaml"
+    scoreboard_delay: float = 5.0
+    pending_scores: Dict[str, Any] = field(default_factory=dict)
 
 
 def save_runtime_state(state: RuntimeState, path: Path = RUNTIME_STATE_PATH) -> None:
@@ -59,4 +61,6 @@ def load_runtime_state(path: Path = RUNTIME_STATE_PATH) -> RuntimeState:
             "IIDX#4": "IIDX#4",
         }),
         state_machine_config=data.get("state_machine_config", "iidx_state_machine/state_machine.yaml"),
+        scoreboard_delay=data.get("scoreboard_delay", 5.0),
+        pending_scores=data.get("pending_scores", {}),
     )
