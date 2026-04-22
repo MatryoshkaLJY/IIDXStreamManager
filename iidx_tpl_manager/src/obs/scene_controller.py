@@ -10,6 +10,7 @@ REQUIRED_SCENES = {
     "sp_team": "SP团队赛",
     "dp_team": "DP团队赛",
     "individual": "个人赛",
+    "scoreboard": "Scoreboard_web",
 }
 
 
