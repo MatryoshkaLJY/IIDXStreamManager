@@ -20,6 +20,7 @@ from src.config.loader import ConfigError, get_player_names, load_configs
 from src.obs import OBSClient, REQUIRED_SCENES, SceneController
 from src.obs.heartbeat import OBSHeartbeat
 from src.obs.monitor import CabinetMonitor
+from src.scoreboard.pusher import ScoreboardPusher
 from src.state import RUNTIME_STATE_PATH, RuntimeState, load_runtime_state, save_runtime_state
 
 
@@ -55,6 +56,10 @@ class RoundPrepForm(BaseModel):
     cabinet_4: str = "Unassigned"
 
 
+class ScoreboardDelayForm(BaseModel):
+    delay: float = Field(..., ge=0.0, le=300.0)
+
+
 def create_app(return_socketio: bool = False):
     project_root = Path(__file__).resolve().parents[1]
     app = Flask(
@@ -75,6 +80,9 @@ def create_app(return_socketio: bool = False):
     scene_controller = SceneController(client)
     app._scene_controller = scene_controller
     app._obs_client = client
+
+    pusher = ScoreboardPusher()
+    app._scoreboard_pusher = pusher
 
     def _validate_and_emit_obs_state() -> None:
         scene_controller.validate_scenes()
@@ -107,6 +115,8 @@ def create_app(return_socketio: bool = False):
             obs_port=runtime_state.obs_port,
             obs_password=runtime_state.obs_password,
             monitoring_active=runtime_state.monitoring_active,
+            scoreboard_delay=runtime_state.scoreboard_delay,
+            pending_scores=runtime_state.pending_scores,
         )
 
     @app.route("/switch_scene", methods=["POST"])
@@ -119,6 +129,163 @@ def create_app(return_socketio: bool = False):
         if ok:
             return jsonify({"success": True}), 200
         return jsonify({"success": False, "error": error}), 200
+
+    @app.route("/api/scoreboard_delay", methods=["POST"])
+    def scoreboard_delay():
+        payload = request.get_json(silent=True) or request.form.to_dict()
+        try:
+            form = ScoreboardDelayForm(**payload)
+        except Exception as exc:
+            return jsonify({"success": False, "error": str(exc)}), 200
+        runtime_state = load_runtime_state()
+        runtime_state.scoreboard_delay = form.delay
+        save_runtime_state(runtime_state)
+        socketio.emit("scoreboard_delay_updated", {"delay": form.delay})
+        return jsonify({"success": True, "delay": form.delay}), 200
+
+    @app.route("/confirm_score", methods=["POST"])
+    def confirm_score():
+        runtime_state = load_runtime_state()
+        pending = dict(runtime_state.pending_scores)
+        if not pending:
+            return jsonify({"success": False, "error": "No pending scores"}), 200
+
+        # Validate no invalid scores remain
+        for data in pending.values():
+            scores = data.get("scores", {})
+            if not scores.get("1p_valid", False) or not scores.get("2p_valid", False):
+                return jsonify({"success": False, "error": "Invalid scores must be corrected first"}), 200
+
+        # Switch OBS to Scoreboard_web
+        ok, error = scene_controller.switch_to("Scoreboard_web")
+        if not ok:
+            return jsonify({"success": False, "error": error}), 200
+
+        # Build and push score based on mode
+        mode = runtime_state.mode
+        round_number = runtime_state.current_round
+        assignments = runtime_state.cabinet_assignments
+
+        try:
+            configs = load_configs()
+        except Exception as exc:
+            return jsonify({"success": False, "error": f"Failed to load configs: {exc}"}), 200
+
+        if mode == "team":
+            # Flatten team schedule to find current match and round
+            team_schedule = configs.get("team_schedule")
+            if not team_schedule:
+                return jsonify({"success": False, "error": "Team schedule not loaded"}), 200
+
+            target_match = None
+            target_round_idx = None
+            target_round = None
+            counter = 0
+            for week in team_schedule.weeks:
+                for match in week.matches:
+                    for idx, r in enumerate(match.rounds):
+                        if counter == round_number - 1:
+                            target_match = match
+                            target_round_idx = idx
+                            target_round = r
+                            break
+                        counter += 1
+                    if target_match:
+                        break
+                if target_match:
+                    break
+
+            if target_round is None:
+                return jsonify({"success": False, "error": "Round not found in team schedule"}), 200
+
+            round_in_match = target_round_idx + 1
+
+            left_players = set(target_round.left_players)
+            right_players = set(target_round.right_players)
+
+            if target_round.type == "1v1":
+                # Find the two active players and their scores
+                left_score_val = 0
+                right_score_val = 0
+                left_ex = None
+                right_ex = None
+                for machine_id, data in pending.items():
+                    player = assignments.get(machine_id, "Unassigned")
+                    if player == "Unassigned":
+                        continue
+                    scores = data.get("scores", {})
+                    ex_score = scores.get("1p_score") or scores.get("2p_score") or 0
+                    if player in left_players:
+                        left_ex = ex_score
+                    elif player in right_players:
+                        right_ex = ex_score
+                if left_ex is not None and right_ex is not None:
+                    if left_ex >= right_ex:
+                        left_score_val = target_round.points
+                    else:
+                        right_score_val = target_round.points
+                pusher.push_team_score(round_in_match, left_score_val, right_score_val)
+            else:
+                # 2v2: rank all 4 EX scores and assign points
+                ex_scores = []
+                for machine_id, data in pending.items():
+                    player = assignments.get(machine_id, "Unassigned")
+                    if player == "Unassigned":
+                        continue
+                    if player in left_players or player in right_players:
+                        scores = data.get("scores", {})
+                        ex_score = scores.get("1p_score") or scores.get("2p_score") or 0
+                        ex_scores.append({"player": player, "ex": ex_score, "side": "left" if player in left_players else "right"})
+                # Sort descending
+                ex_scores.sort(key=lambda x: x["ex"], reverse=True)
+                # Assign points: 1st=3, 2nd=2, 3rd=1, 4th=0
+                rank_points = {0: 3, 1: 2, 2: 1, 3: 0}
+                left_score_val = 0
+                right_score_val = 0
+                for rank, entry in enumerate(ex_scores):
+                    pts = rank_points.get(rank, 0)
+                    if entry["side"] == "left":
+                        left_score_val += pts
+                    else:
+                        right_score_val += pts
+                pusher.push_team_score(round_in_match, left_score_val, right_score_val)
+        elif mode == "individual":
+            individual_schedule = configs.get("individual_schedule")
+            if not individual_schedule:
+                return jsonify({"success": False, "error": "Individual schedule not loaded"}), 200
+
+            # Map round to group: flatten groups alphabetically, 4 rounds per group
+            groups = sorted(individual_schedule.groups.keys())
+            group_idx = (round_number - 1) // 4
+            if group_idx >= len(groups):
+                return jsonify({"success": False, "error": "Round exceeds available groups"}), 200
+            group_name_raw = groups[group_idx]
+            group_name = group_name_raw.replace("组", "")
+            stage = "quarterfinal"
+            if group_name in ("E", "F"):
+                stage = "semifinal"
+            elif group_name == "finals":
+                stage = "final"
+            round_in_group = ((round_number - 1) % 4) + 1
+
+            scores = []
+            for machine_id in ["IIDX#1", "IIDX#2", "IIDX#3", "IIDX#4"]:
+                player = assignments.get(machine_id, "Unassigned")
+                if player == "Unassigned":
+                    continue
+                data = pending.get(machine_id, {})
+                score_data = data.get("scores", {})
+                ex_score = score_data.get("1p_score") or score_data.get("2p_score") or 0
+                scores.append({"player": player, "score": ex_score})
+            pusher.push_individual_score(stage, group_name, round_in_group, scores)
+        else:
+            return jsonify({"success": False, "error": "Unknown tournament mode"}), 200
+
+        # Clear pending scores after push
+        runtime_state.pending_scores = {}
+        save_runtime_state(runtime_state)
+        socketio.emit("scores_pushed", {"mode": mode, "round": round_number})
+        return jsonify({"success": True}), 200
 
     @app.route("/obs_config", methods=["POST"])
     def obs_config():
