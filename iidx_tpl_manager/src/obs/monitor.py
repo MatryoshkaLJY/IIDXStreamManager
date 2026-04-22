@@ -121,9 +121,11 @@ class CabinetMonitor:
                     break
                 try:
                     result = obs.process_frame(machine_id)
+                    state_info = result.get("state") or {}
+                    current_state = state_info.get("current_state", "")
 
                     # Persist pending scores to RuntimeState
-                    if result.get("state") == "score" and result.get("score_validation_pending", False):
+                    if current_state == "score" and result.get("score_validation_pending", False):
                         scores_data = result.get("scores") or {}
                         pending = {
                             "machine_id": machine_id,
@@ -137,7 +139,7 @@ class CabinetMonitor:
                         runtime_state = load_runtime_state()
                         runtime_state.pending_scores[machine_id] = pending
                         save_runtime_state(runtime_state)
-                    elif result.get("state") != "score":
+                    elif current_state != "score":
                         runtime_state = load_runtime_state()
                         if machine_id in runtime_state.pending_scores:
                             runtime_state.pending_scores.pop(machine_id, None)
@@ -146,7 +148,7 @@ class CabinetMonitor:
                     payload: Dict[str, Any] = {
                         "machine_id": result.get("machine_id", machine_id),
                         "label": result.get("label"),
-                        "state": result.get("state"),
+                        "state": current_state,
                         "scores": result.get("scores"),
                         "score_validation_pending": result.get("score_validation_pending", False),
                     }
