@@ -27,6 +27,7 @@ class TestSceneController:
                 {"sceneName": "SP团队赛"},
                 {"sceneName": "DP团队赛"},
                 {"sceneName": "个人赛"},
+                {"sceneName": "Scoreboard_web"},
             ]
         }
         ctrl = SceneController(obs)
@@ -49,6 +50,7 @@ class TestSceneController:
         assert ok is False
         assert "DP团队赛" in missing
         assert "个人赛" in missing
+        assert "Scoreboard_web" in missing
         assert ctrl.scenes_valid is False
 
     def test_switch_to_returns_not_ready_when_disconnected(self):
@@ -77,6 +79,7 @@ class TestSceneController:
                 {"sceneName": "SP团队赛"},
                 {"sceneName": "DP团队赛"},
                 {"sceneName": "个人赛"},
+                {"sceneName": "Scoreboard_web"},
             ]
         }
         ctrl = SceneController(obs)
@@ -95,6 +98,7 @@ class TestSceneController:
                 {"sceneName": "SP团队赛"},
                 {"sceneName": "DP团队赛"},
                 {"sceneName": "个人赛"},
+                {"sceneName": "Scoreboard_web"},
             ]
         }
         obs.set_current_program_scene.side_effect = OBSSDKRequestError("missing scene", 100, "scene not found")
@@ -113,6 +117,7 @@ class TestSceneController:
                 {"sceneName": "SP团队赛"},
                 {"sceneName": "DP团队赛"},
                 {"sceneName": "个人赛"},
+                {"sceneName": "Scoreboard_web"},
             ]
         }
         ctrl = SceneController(obs)
