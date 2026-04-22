@@ -120,8 +120,13 @@ Plan list:
   2. Operator can set custom delay values in the web UI for scoreboard display and return-to-live timing
   3. Setting a delay to `-1` pauses automatic advancement until the operator clicks a manual proceed button
   4. An "Emergency Live" button is always visible; clicking it immediately cuts to the Live camera scene and pauses automation
-**Plans**: TBD
+**Plans**: 3 plans
 **UI hint**: yes
+
+Plan list:
+- [ ] `07-01-PLAN.md` — Backend: AutoTransitionController, RuntimeState extensions, automation logic
+- [ ] `07-02-PLAN.md` — Flask Integration: routes, SocketIO events, automation control endpoints
+- [ ] `07-03-PLAN.md` — UI: Automation page, status banner, Proceed button, Emergency Live button
 
 ## Progress
 
@@ -136,4 +141,4 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7
 | 4. Tournament Setup & Round Prep UI | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 5. Cabinet Monitoring & Live Monitor UI | v1.2 | 3/3 | Complete | 2026-04-15 |
 | 6. Score Review & Scoreboard Integration | v1.2 | 3/3 | Complete | 2026-04-22 |
-| 7. Auto-Transitions & Configurable Delays | v1.2 | 0/TBD | Not started | - |
+| 7. Auto-Transitions & Configurable Delays | v1.2 | 0/3 | Planned | - |
