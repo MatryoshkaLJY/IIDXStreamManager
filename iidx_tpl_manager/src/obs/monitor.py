@@ -16,7 +16,7 @@ except ImportError:
         sys.path.insert(0, project_root)
     from obs_manager.obs_manager import OBSManager
 
-from src.state import RuntimeState, load_runtime_state
+from src.state import RuntimeState, load_runtime_state, save_runtime_state
 
 logger = logging.getLogger(__name__)
 
@@ -121,21 +121,42 @@ class CabinetMonitor:
                     break
                 try:
                     result = obs.process_frame(machine_id)
+
+                    # Persist pending scores to RuntimeState
+                    if result.get("state") == "score" and result.get("score_validation_pending", False):
+                        scores_data = result.get("scores") or {}
+                        pending = {
+                            "machine_id": machine_id,
+                            "scores": {
+                                "1p_score": scores_data.get("1p_score"),
+                                "2p_score": scores_data.get("2p_score"),
+                                "1p_valid": scores_data.get("1p_valid", False),
+                                "2p_valid": scores_data.get("2p_valid", False),
+                            },
+                        }
+                        runtime_state = load_runtime_state()
+                        runtime_state.pending_scores[machine_id] = pending
+                        save_runtime_state(runtime_state)
+                    elif result.get("state") != "score":
+                        runtime_state = load_runtime_state()
+                        if machine_id in runtime_state.pending_scores:
+                            runtime_state.pending_scores.pop(machine_id, None)
+                            save_runtime_state(runtime_state)
+
+                    payload: Dict[str, Any] = {
+                        "machine_id": result.get("machine_id", machine_id),
+                        "label": result.get("label"),
+                        "state": result.get("state"),
+                        "scores": result.get("scores"),
+                        "score_validation_pending": result.get("score_validation_pending", False),
+                    }
+
+                    # Console output: single JSON line per D-15
+                    print(json.dumps(payload, ensure_ascii=False, default=str))
+
+                    self.socketio.emit("cabinet_update", payload)
                 except Exception as exc:
                     logger.warning("process_frame failed for %s: %s", machine_id, exc)
                     continue
-
-                payload: Dict[str, Any] = {
-                    "machine_id": result.get("machine_id", machine_id),
-                    "label": result.get("label"),
-                    "state": result.get("state"),
-                    "scores": result.get("scores"),
-                    "score_validation_pending": result.get("score_validation_pending", False),
-                }
-
-                # Console output: single JSON line per D-15
-                print(json.dumps(payload, ensure_ascii=False, default=str))
-
-                self.socketio.emit("cabinet_update", payload)
 
             self._stop.wait(interval)
