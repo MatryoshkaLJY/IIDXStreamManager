@@ -132,8 +132,8 @@ Phases execute in numeric order: 3 → 4 → 5 → 6 → 7
 |-------|-----------|----------------|--------|-----------|
 | 1. Knockout Scoreboard | v1.0 | 7/7 | Complete | 2026-04-13 |
 | 2. Rule Refinements | v1.1 | 2/2 | Complete | 2026-04-15 |
-| 3. OBS Integration & Scene Control | v1.2 | 0/4 | Not started | - |
-| 4. Tournament Setup & Round Prep UI | v1.2 | 0/TBD | Not started | - |
-| 5. Cabinet Monitoring & Live Monitor UI | v1.2 | 0/TBD | Not started | - |
-| 6. Score Review & Scoreboard Integration | v1.2 | 0/3 | Not started | - |
+| 3. OBS Integration & Scene Control | v1.2 | 4/4 | Complete | 2026-04-15 |
+| 4. Tournament Setup & Round Prep UI | v1.2 | 3/3 | Complete | 2026-04-15 |
+| 5. Cabinet Monitoring & Live Monitor UI | v1.2 | 3/3 | Complete | 2026-04-15 |
+| 6. Score Review & Scoreboard Integration | v1.2 | 3/3 | Complete | 2026-04-22 |
 | 7. Auto-Transitions & Configurable Delays | v1.2 | 0/TBD | Not started | - |
