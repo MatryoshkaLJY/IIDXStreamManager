@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import ValidationError
 
@@ -26,7 +26,7 @@ CONFIG_FILES: Dict[str, tuple[str, Any]] = {
 
 TEMPLATES: Dict[str, dict] = {
     "teams.json": {"teams": []},
-    "team_schedule.json": {"weeks": []},
+    "team_schedule.json": {"weeks": [{"matches": [{"left_team": "", "right_team": "", "template": "", "rounds": [{"type": "1v1", "theme": "", "left_players": [], "right_players": [], "points": 1}]}]}]},
     "individual_schedule.json": {"groups": {}},
 }
 
@@ -67,3 +67,20 @@ def load_configs(config_dir: Path = CONFIG_DIR) -> Dict[str, Any]:
                 "Fix the file and reload the page to retry."
             ) from exc
     return loaded
+
+
+def get_player_names(configs: Dict[str, Any], mode: str) -> List[str]:
+    """Return a sorted list of unique player names for the given mode."""
+    names: List[str] = []
+    if mode == "team":
+        teams_config = configs.get("teams")
+        if teams_config:
+            for team in teams_config.teams:
+                for player in team.players:
+                    names.append(player.name)
+    elif mode == "individual":
+        individual_config = configs.get("individual_schedule")
+        if individual_config:
+            for group in individual_config.groups.values():
+                names.extend(group)
+    return sorted(set(names))

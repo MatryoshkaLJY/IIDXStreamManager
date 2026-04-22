@@ -32,6 +32,7 @@ class Round(BaseModel):
     theme: str
     left_players: List[str]
     right_players: List[str]
+    points: int = 1
 
 
 class Match(BaseModel):
