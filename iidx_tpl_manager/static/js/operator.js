@@ -149,4 +149,219 @@
         });
     });
   }
+
+  // Score review panel
+  const reviewPanel = document.getElementById('score-review-panel');
+  const reviewRows = document.getElementById('score-review-rows');
+  const reviewToggle = document.getElementById('score-review-toggle');
+  const confirmBtn = document.getElementById('confirm-score-btn');
+  const countdownEl = document.getElementById('score-countdown');
+  const delayInput = document.getElementById('scoreboard-delay');
+  const reviewError = document.getElementById('score-review-error');
+  const reviewEmpty = document.getElementById('score-review-empty');
+
+  let pendingScores = window.initialPendingScores || {};
+  let scoreboardDelay = window.initialScoreboardDelay || 5.0;
+  let countdownInterval = null;
+  let isCollapsed = false;
+
+  function renderReviewPanel() {
+    if (!reviewRows) return;
+    reviewRows.innerHTML = '';
+    const machineIds = ['IIDX#1', 'IIDX#2', 'IIDX#3', 'IIDX#4'];
+    const hasAny = machineIds.some((id) => pendingScores[id]);
+
+    if (!hasAny) {
+      if (reviewEmpty) reviewEmpty.style.display = 'block';
+      if (confirmBtn) {
+        confirmBtn.style.display = 'none';
+        confirmBtn.disabled = true;
+      }
+      if (reviewError) reviewError.style.display = 'none';
+      return;
+    }
+
+    if (reviewEmpty) reviewEmpty.style.display = 'none';
+    if (confirmBtn) confirmBtn.style.display = 'inline-block';
+
+    let hasInvalid = false;
+    machineIds.forEach((machineId) => {
+      const data = pendingScores[machineId];
+      if (!data) return;
+      const scores = data.scores || {};
+      const p1Score = scores['1p_score'] != null ? String(scores['1p_score']) : '';
+      const p2Score = scores['2p_score'] != null ? String(scores['2p_score']) : '';
+      const p1Valid = scores['1p_valid'];
+      const p2Valid = scores['2p_valid'];
+      if (!p1Valid || !p2Valid) hasInvalid = true;
+
+      const row = document.createElement('div');
+      row.className = 'score-review-row';
+      row.innerHTML = `
+        <div class="label">${machineId}</div>
+        <div class="label"></div>
+        <div class="score-cell ${p1Valid ? '' : 'score-invalid'}" data-machine-id="${machineId}" data-side="1p">${p1Score}</div>
+        <div class="score-cell ${p2Valid ? '' : 'score-invalid'}" data-machine-id="${machineId}" data-side="2p">${p2Score}</div>
+        <div class="score-validity ${(!p1Valid || !p2Valid) ? 'invalid' : ''}"></div>
+      `;
+      reviewRows.appendChild(row);
+    });
+
+    if (reviewError) reviewError.style.display = hasInvalid ? 'block' : 'none';
+    if (confirmBtn) confirmBtn.disabled = hasInvalid;
+  }
+
+  // Inline editing
+  if (reviewRows) {
+    reviewRows.addEventListener('click', (event) => {
+      const cell = event.target.closest('.score-cell');
+      if (!cell) return;
+      const machineId = cell.dataset.machineId;
+      const side = cell.dataset.side;
+      const currentValue = cell.textContent.trim();
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.value = currentValue;
+      input.style.width = '100%';
+      input.style.background = 'transparent';
+      input.style.border = 'none';
+      input.style.color = 'inherit';
+      input.style.textAlign = 'right';
+      input.style.fontSize = 'inherit';
+      input.style.outline = 'none';
+
+      cell.innerHTML = '';
+      cell.appendChild(input);
+      input.focus();
+
+      function commitEdit() {
+        const newValue = input.value.trim();
+        const numValue = newValue === '' ? 0 : parseInt(newValue, 10);
+        if (pendingScores[machineId] && pendingScores[machineId].scores) {
+          pendingScores[machineId].scores[side + '_score'] = numValue;
+        }
+        renderReviewPanel();
+      }
+
+      input.addEventListener('blur', commitEdit);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          input.blur();
+        }
+      });
+    });
+  }
+
+  // Toggle collapse
+  if (reviewToggle && reviewRows) {
+    reviewToggle.addEventListener('click', () => {
+      isCollapsed = !isCollapsed;
+      reviewRows.style.display = isCollapsed ? 'none' : 'block';
+      if (confirmBtn) confirmBtn.style.display = isCollapsed ? 'none' : 'inline-block';
+      if (countdownEl) countdownEl.style.display = 'none';
+      reviewToggle.textContent = isCollapsed ? 'Show' : 'Hide';
+    });
+  }
+
+  // Scoreboard delay save
+  function saveDelay() {
+    const value = parseFloat(delayInput.value);
+    if (Number.isNaN(value)) return;
+    fetch('/api/scoreboard_delay', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ delay: value }),
+    }).catch((err) => {
+      console.error('Scoreboard delay save error', err);
+    });
+  }
+
+  if (delayInput) {
+    delayInput.addEventListener('blur', saveDelay);
+    delayInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        delayInput.blur();
+      }
+    });
+  }
+
+  // Confirm & Push
+  if (confirmBtn) {
+    confirmBtn.addEventListener('click', () => {
+      fetch('/confirm_score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      })
+        .then((resp) => resp.json())
+        .then((data) => {
+          if (data && data.success) {
+            if (countdownEl) {
+              countdownEl.style.display = 'block';
+              let remaining = Math.ceil(scoreboardDelay);
+              countdownEl.textContent = `Pushing in ${remaining}s...`;
+              countdownInterval = setInterval(() => {
+                remaining -= 1;
+                if (remaining > 0) {
+                  countdownEl.textContent = `Pushing in ${remaining}s...`;
+                } else {
+                  countdownEl.textContent = 'Pushing scores...';
+                  countdownEl.classList.add('pulsing');
+                  clearInterval(countdownInterval);
+                  countdownInterval = null;
+                  setTimeout(() => {
+                    countdownEl.style.display = 'none';
+                    countdownEl.classList.remove('pulsing');
+                  }, 1000);
+                }
+              }, 1000);
+            }
+          } else {
+            console.error('Confirm score failed', data && data.error);
+          }
+        })
+        .catch((err) => {
+          console.error('Confirm score error', err);
+        });
+    });
+  }
+
+  // SocketIO integration
+  socket.on('cabinet_update', (data) => {
+    console.log('cabinet_update', data);
+    if (data.state === 'score' && data.score_validation_pending) {
+      pendingScores[data.machine_id] = {
+        machine_id: data.machine_id,
+        scores: data.scores || {},
+      };
+      renderReviewPanel();
+    } else if (data.state !== 'score' && pendingScores[data.machine_id]) {
+      delete pendingScores[data.machine_id];
+      renderReviewPanel();
+    }
+  });
+
+  socket.on('scores_pushed', () => {
+    pendingScores = {};
+    renderReviewPanel();
+    if (countdownInterval) {
+      clearInterval(countdownInterval);
+      countdownInterval = null;
+    }
+    if (countdownEl) {
+      countdownEl.style.display = 'none';
+      countdownEl.classList.remove('pulsing');
+    }
+  });
+
+  socket.on('scoreboard_delay_updated', (data) => {
+    if (typeof data.delay === 'number') {
+      scoreboardDelay = data.delay;
+      if (delayInput) delayInput.value = scoreboardDelay;
+    }
+  });
+
+  // Initial render
+  renderReviewPanel();
 })();
