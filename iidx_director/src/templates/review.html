@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block page_id %}review{% endblock %}
+{% block content %}
+<div class="card" id="no-session">
+  <h2>比分确认</h2>
+  <p>当前没有进行中的回合。</p>
+</div>
+
+<div id="live-area" class="hidden">
+  <div class="card">
+    <h2 id="live-title">比赛进行中</h2>
+    <div class="cabinet-grid" id="cabinet-grid"></div>
+    <div class="hint">状态机触发抓分后自动进入确认环节。若长时间无反应，请检查机台画面与识别服务。</div>
+    <div style="margin-top:14px">
+      <button class="secondary" onclick="toggleManual()">抓分失败？手动录入</button>
+      <div id="manual-entry" class="hidden" style="margin-top:10px">
+        <table><tr><th>选手</th><th>EX 分</th></tr><tbody id="manual-rows"></tbody></table>
+        <div class="row" style="margin-top:10px">
+          <button onclick="submitManual()">进入比分确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="review-area" class="hidden">
+  <div class="card">
+    <h2>确认比分（可修改）</h2>
+    <div class="score-screenshots" id="score-screenshots"></div>
+    <table>
+      <tr><th>选手</th><th>机台</th><th>侧</th><th>EX 分</th></tr>
+      <tbody id="score-rows"></tbody>
+    </table>
+    <div class="verdict" id="verdict"></div>
+    <div class="row">
+      <button class="big" id="confirm-score-btn" onclick="confirmScores()">✓ 切换计分板并写入</button>
+    </div>
+  </div>
+</div>
+
+<div id="pushed-area" class="hidden">
+  <div class="card">
+    <h2>已写入记分板</h2>
+    <div class="verdict" id="pushed-verdict"></div>
+    <div class="row">
+      <button class="secondary" id="repush-btn" onclick="repush()">重试推送</button>
+      <button class="big" onclick="advance()">进入下一回合 →</button>
+    </div>
+  </div>
+</div>
+
+<div id="end-area" class="hidden">
+  <div class="card">
+    <h2>🏁 比赛结束</h2>
+    <div id="end-detail"></div>
+    <button class="secondary" onclick="postJSON('/api/match/abort')">清理并返回</button>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+const cabinets = {};
+
+window.onSessionUpdate = function (snap) {
+  const session = snap.session;
+  const phase = session ? session.phase : 'IDLE';
+  for (const id of ['no-session', 'live-area', 'review-area', 'pushed-area', 'end-area']) {
+    document.getElementById(id).classList.add('hidden');
+  }
+  if (!session || phase === 'IDLE') {
+    document.getElementById('no-session').classList.remove('hidden');
+  } else if (phase === 'PREP') {
+    window.location.href = '/prep';
+  } else if (phase === 'LIVE') {
+    document.getElementById('live-area').classList.remove('hidden');
+    manualPlayers = session.round ? session.round.players : [];
+    renderLiveTitle(session.round);
+    renderCabinets(snap);
+  } else if (phase === 'REVIEW') {
+    document.getElementById('review-area').classList.remove('hidden');
+    renderReview(session, snap);
+  } else if (phase === 'PUSHED') {
+    document.getElementById('pushed-area').classList.remove('hidden');
+    document.getElementById('pushed-verdict').innerHTML = verdictHtml(session.last_result);
+  } else if (phase === 'MATCH_END') {
+    document.getElementById('end-area').classList.remove('hidden');
+    renderEnd(session);
+  }
+};
+
+window.onCabinetUpdate = function (data) {
+  cabinets[data.machine_id] = data;
+  const cell = document.getElementById('cab-' + cssSafe(data.machine_id));
+  if (cell) {
+    cell.querySelector('.st').textContent =
+      `${data.label || '-'} / ${data.state || '-'}` + (data.scores ? '　✓ 已抓分' : '');
+  }
+};
+
+function cssSafe(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
+
+let manualPlayers = [];
+
+function toggleManual() {
+  const area = document.getElementById('manual-entry');
+  area.classList.toggle('hidden');
+  if (area.classList.contains('hidden')) return;
+  const tbody = document.getElementById('manual-rows');
+  tbody.innerHTML = '';
+  for (const player of manualPlayers) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><b>${esc(player)}</b></td>
+      <td><input class="ex-input manual-ex" type="number" data-player="${esc(player)}"></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function submitManual() {
+  const scores = {};
+  let valid = true;
+  document.querySelectorAll('.manual-ex').forEach(input => {
+    const v = parseInt(input.value);
+    if (isNaN(v)) { toast('请输入有效分数', true); valid = false; }
+    scores[input.dataset.player] = v;
+  });
+  if (!valid) return;
+  await postJSON('/api/round/force_review', { scores });
+}
+
+function renderLiveTitle(round) {
+  document.getElementById('live-title').textContent = round.mode === 'team'
+    ? `第 ${round.round_no}/${round.total_rounds} 回合进行中（${esc(round.type)} ${esc(round.theme || '')}）`
+    : `${esc(round.group)} 组第 ${round.round_no} 局进行中`;
+}
+
+function renderCabinets(snap) {
+  const grid = document.getElementById('cabinet-grid');
+  grid.innerHTML = '';
+  for (const m of snap.machines) {
+    const div = document.createElement('div');
+    div.className = 'cabinet-cell';
+    div.id = 'cab-' + cssSafe(m);
+    div.innerHTML = `<div class="mid">${esc(m)}</div><div class="st">-</div>`;
+    grid.appendChild(div);
+  }
+}
+
+function verdictHtml(result) {
+  if (!result) return '';
+  if (result.mode === 'team') {
+    const w = result.winner === 'draw' ? '平局' : (result.winner === 'left' ? '左队胜' : '右队胜');
+    return `判定：左 ${result.left_points} — 右 ${result.right_points}（${w}）`;
+  }
+  return '名次：' + (result.ranking || []).map(esc).join(' &gt; ');
+}
+
+function renderReview(session, snap) {
+  renderScreenshots(session, snap.screenshots || {});
+  const tbody = document.getElementById('score-rows');
+  tbody.innerHTML = '';
+  const scores = (session.last_result && session.last_result.scores) || {};
+  for (const [player, slot] of Object.entries(session.assignments)) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${esc(player)}</b></td>
+      <td>${esc(slot.machine)}</td><td>${esc(slot.side)}</td>
+      <td><input class="ex-input" type="number" data-player="${esc(player)}" value="${scores[player] ?? ''}"></td>`;
+    tbody.appendChild(tr);
+  }
+  document.getElementById('verdict').innerHTML = verdictHtml(session.last_result);
+}
+
+function renderScreenshots(session, screenshots) {
+  const area = document.getElementById('score-screenshots');
+  area.innerHTML = '';
+  const seen = new Set();
+  for (const [player, slot] of Object.entries(session.assignments)) {
+    const machine = slot.machine;
+    if (seen.has(machine)) continue;
+    seen.add(machine);
+    const wrapper = document.createElement('figure');
+    wrapper.className = 'score-screenshot';
+    const caption = document.createElement('figcaption');
+    const players = Object.entries(session.assignments)
+      .filter(([, assigned]) => assigned.machine === machine)
+      .map(([name]) => name).join('、');
+    caption.textContent = `${machine}　${players}`;
+    wrapper.appendChild(caption);
+    if (screenshots[machine]) {
+      const image = document.createElement('img');
+      image.src = screenshots[machine] + `?t=${Date.now()}`;
+      image.alt = `${machine} 成绩界面`;
+      wrapper.appendChild(image);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'screenshot-empty';
+      empty.textContent = '暂无成绩截图（可能为手动录入）';
+      wrapper.appendChild(empty);
+    }
+    area.appendChild(wrapper);
+  }
+}
+
+async function confirmScores() {
+  const scores = {};
+  let valid = true;
+  document.querySelectorAll('.ex-input').forEach(input => {
+    const v = parseInt(input.value);
+    if (isNaN(v)) { toast(`请输入有效分数`, true); valid = false; }
+    scores[input.dataset.player] = v;
+  });
+  if (!valid) return;
+  const button = document.getElementById('confirm-score-btn');
+  setButtonBusy(button, true, '切换计分板并等待…');
+  try {
+    const resp = await postJSON('/api/round/confirm', { scores });
+    if (resp.success) toast('已写入记分板');
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
+
+async function repush() {
+  const button = document.getElementById('repush-btn');
+  setButtonBusy(button, true, '等待计分板动画…');
+  try {
+    const resp = await postJSON('/api/round/repush');
+    if (resp.success) toast('重推成功');
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
+
+async function advance() {
+  const resp = await postJSON('/api/round/advance');
+  if (resp.success && !resp.match_end) window.location.href = '/prep';
+}
+
+function renderEnd(session) {
+  const summary = session.summary || {};
+  let html;
+  if (session.mode === 'knockout' && summary.final_ranking) {
+    const medals = ['🥇', '🥈', '🥉', '4.'];
+    html = '<p>' + summary.final_ranking.map((p, i) => `${medals[i] || ''} ${esc(p)}`).join('<br>') + '</p>';
+  } else if (session.mode === 'team') {
+    html = `<p>共完成 ${(summary.team_rounds || []).length} 回合。</p>`;
+  } else {
+    html = '<p>全部赛程已完成。</p>';
+  }
+  document.getElementById('end-detail').innerHTML = html;
+}
+</script>
+{% endblock %}

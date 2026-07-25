@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block page_id %}prep{% endblock %}
+{% block content %}
+<div class="card" id="no-session">
+  <h2>回合准备</h2>
+  <p>当前没有进行中的比赛。请到「设置 / 赛程」导入赛程并开始比赛。</p>
+</div>
+
+<div id="prep-area" class="hidden">
+  <div class="card">
+    <h2 id="round-title">-</h2>
+    <div id="round-detail"></div>
+  </div>
+
+  <div class="card">
+    <h2>机台分配</h2>
+    <table>
+      <tr><th>选手</th><th>队伍</th><th>机台</th><th>侧</th></tr>
+      <tbody id="assign-rows"></tbody>
+    </table>
+    <div class="row" style="margin-top:12px">
+      <label>游戏场景 <input id="scene-name" list="obs-scenes" style="width:180px"></label>
+      <datalist id="obs-scenes"></datalist>
+    </div>
+    <button class="big" onclick="beginRound()">✓ 确认开始比赛</button>
+    <div class="hint">确认后将：推送场景信息 → 进入抓分状态。OBS 场景请使用顶部快捷按钮手动切换。请先到「比分确认」页确认监控已启动。</div>
+  </div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+let currentSnap = null;
+
+window.onSessionUpdate = function (snap) {
+  currentSnap = snap;
+  const session = snap.session;
+  const show = session && session.phase === 'PREP';
+  document.getElementById('no-session').classList.toggle('hidden', !!show);
+  document.getElementById('prep-area').classList.toggle('hidden', !show);
+  if (!show) {
+    if (session && (session.phase === 'LIVE' || session.phase === 'REVIEW')) {
+      window.location.href = '/review';
+    }
+    return;
+  }
+  renderRound(session.round, snap);
+  renderAssignments(session.round, session.assignments, snap);
+};
+
+function renderRound(round, snap) {
+  let title, detail = '';
+  if (round.mode === 'team') {
+    title = `${esc(round.left_team)} vs ${esc(round.right_team)} — 第 ${round.round_no}/${round.total_rounds} 回合`;
+    detail = `<p>类型 ${esc(round.type)}　主题 ${esc(round.theme || '-')}　分值 ${round.points}</p>
+      <p>${esc(round.left_players.join('、'))} 对阵 ${esc(round.right_players.join('、'))}</p>`;
+    if (!document.getElementById('scene-name').value) {
+      document.getElementById('scene-name').value = snap.scenes.team_sp || '';
+    }
+  } else {
+    title = `淘汰赛 ${esc(round.group)} 组 — 第 ${round.round_no} 局${round.tiebreaker ? '（平局决胜）' : ''}`;
+    detail = `<p>选手：${round.players.map(esc).join('、')}</p>`;
+    if (!document.getElementById('scene-name').value) {
+      document.getElementById('scene-name').value = snap.scenes.individual || '';
+    }
+  }
+  document.getElementById('round-title').textContent = title;
+  document.getElementById('round-detail').innerHTML = detail;
+  loadObsScenes();
+}
+
+function teamOf(player, round) {
+  if (round.mode !== 'team') return '';
+  if (round.left_players.includes(player)) return round.left_team;
+  return round.right_team;
+}
+
+function renderAssignments(round, assignments, snap) {
+  const tbody = document.getElementById('assign-rows');
+  tbody.innerHTML = '';
+  for (const player of round.players) {
+    const cur = assignments[player] || {};
+    const machineOpts = snap.machines.map(m =>
+      `<option value="${esc(m)}" ${cur.machine === m ? 'selected' : ''}>${esc(m)}</option>`).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><b>${esc(player)}</b></td>
+      <td>${esc(teamOf(player, round))}</td>
+      <td><select data-player="${esc(player)}" data-field="machine">
+        <option value="">（选择机台）</option>${machineOpts}</select></td>
+      <td><select data-player="${esc(player)}" data-field="side">
+        <option value="1p" ${cur.side !== '2p' ? 'selected' : ''}>1P</option>
+        <option value="2p" ${cur.side === '2p' ? 'selected' : ''}>2P</option>
+      </select></td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadObsScenes() {
+  if (!currentSnap || !currentSnap.obs_connected) return;
+  const resp = await fetch('/api/obs/scenes');
+  const data = await resp.json();
+  if (data.success) {
+    document.getElementById('obs-scenes').innerHTML =
+      data.scenes.map(s => `<option value="${esc(s)}">`).join('');
+  }
+}
+
+async function beginRound() {
+  const assignments = {};
+  document.querySelectorAll('#assign-rows select').forEach(sel => {
+    const p = sel.dataset.player;
+    assignments[p] = assignments[p] || {};
+    assignments[p][sel.dataset.field] = sel.value;
+  });
+  for (const [p, slot] of Object.entries(assignments)) {
+    if (!slot.machine) { toast(`请为 ${p} 选择机台`, true); return; }
+  }
+  let resp = await postJSON('/api/round/assign', { assignments });
+  if (!resp.success) return;
+  resp = await postJSON('/api/round/begin', { scene: document.getElementById('scene-name').value });
+  if (resp.success) { toast('回合已开始，等待抓分'); window.location.href = '/review'; }
+}
+</script>
+{% endblock %}

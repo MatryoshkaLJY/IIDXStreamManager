@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block page_id %}settings{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>OBS 连接</h2>
+  <div class="row">
+    <label>主机 <input id="obs-host" value="localhost" style="width:130px"></label>
+    <label>端口 <input id="obs-port" value="4455" style="width:70px"></label>
+    <label>密码 <input id="obs-password" type="password" style="width:130px" placeholder="留空用环境变量"></label>
+    <button onclick="obsConnect()">连接</button>
+    <button class="secondary" onclick="postJSON('/api/obs/disconnect')">断开</button>
+  </div>
+  <div class="hint">密码不保存到磁盘；也可用环境变量 IIDX_OBS_PASSWORD 提供。</div>
+</div>
+
+<div class="card">
+  <h2>比赛类型</h2>
+  <div class="row">
+    <label><input type="radio" name="mode" value="team"> 团队赛（BPL 记分板 :8080）</label>
+    <label><input type="radio" name="mode" value="knockout"> 个人淘汰赛（记分板 :8081）</label>
+    <button onclick="saveMode()">保存</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>赛程导入</h2>
+  <div class="row">
+    <label>团队赛 team_match.json <input type="file" id="file-team" accept=".json"></label>
+    <button onclick="uploadConfig('team')">上传</button>
+    <button class="secondary" onclick="downloadTemplate('team')">下载模板</button>
+    <button class="secondary" onclick="viewConfig('team')">查看当前</button>
+  </div>
+  <div class="row">
+    <label>淘汰赛 knockout.json <input type="file" id="file-knockout" accept=".json"></label>
+    <button onclick="uploadConfig('knockout')">上传</button>
+    <button class="secondary" onclick="downloadTemplate('knockout')">下载模板</button>
+    <button class="secondary" onclick="viewConfig('knockout')">查看当前</button>
+  </div>
+  <pre id="config-view" class="hint" style="max-height:260px;overflow:auto"></pre>
+</div>
+
+<div class="card">
+  <h2>比赛控制</h2>
+  <div class="row">
+    <button class="big" onclick="startMatch()">▶ 开始比赛（init 记分板）</button>
+    <button class="danger" onclick="abortMatch()">中止比赛</button>
+  </div>
+  <div class="row">
+    <button class="secondary" onclick="resetBoard('bpl')">重置 BPL 记分板</button>
+    <button class="secondary" onclick="resetBoard('knockout')">重置淘汰赛记分板</button>
+  </div>
+</div>
+
+<div class="card">
+  <h2>机台监控</h2>
+  <div class="row">
+    <button onclick="postJSON('/api/monitor', {action:'start'})">启动监控</button>
+    <button class="secondary" onclick="postJSON('/api/monitor', {action:'stop'})">停止监控</button>
+  </div>
+  <div class="hint">监控轮询 4 台机台画面，状态机触发抓分后自动带入当前回合。导播台启动时会自动准备识别服务。</div>
+</div>
+{% endblock %}
+{% block script %}
+<script>
+window.onSessionUpdate = function (snap) {
+  document.querySelector(`input[name=mode][value=${snap.mode}]`).checked = true;
+};
+
+async function obsConnect() {
+  await postJSON('/api/obs/connect', {
+    host: document.getElementById('obs-host').value,
+    port: parseInt(document.getElementById('obs-port').value),
+    password: document.getElementById('obs-password').value || null,
+  });
+}
+
+async function saveMode() {
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  await postJSON('/api/mode', { mode });
+}
+
+async function uploadConfig(kind) {
+  const file = document.getElementById('file-' + kind).files[0];
+  if (!file) { toast('请先选择文件', true); return; }
+  const content = await file.text();
+  const resp = await postJSON('/api/config/upload', { kind, content });
+  if (resp.success) toast('已导入并校验通过');
+}
+
+async function downloadTemplate(kind) {
+  const resp = await fetch('/api/config/template/' + kind);
+  const data = await resp.json();
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = kind === 'team' ? 'team_match.json' : 'knockout.json';
+  a.click();
+}
+
+async function viewConfig(kind) {
+  const resp = await fetch('/api/config/current/' + kind);
+  const data = await resp.json();
+  document.getElementById('config-view').textContent =
+    data.success ? JSON.stringify(data.config, null, 2) : (data.error || '加载失败');
+}
+
+async function startMatch() {
+  const resp = await postJSON('/api/match/start');
+  if (resp.success) { toast('比赛已开始，进入回合准备'); window.location.href = '/prep'; }
+}
+
+async function abortMatch() {
+  if (!confirm('确定中止当前比赛？进度将丢失。')) return;
+  await postJSON('/api/match/abort');
+}
+
+async function resetBoard(board) {
+  const resp = await postJSON('/api/scoreboard/reset', { board });
+  if (resp.success) toast('已发送 reset');
+}
+</script>
+{% endblock %}

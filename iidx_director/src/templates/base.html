@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IIDX 导播台{% block title %}{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body data-page="{% block page_id %}{% endblock %}">
+<nav>
+  <span class="brand">IIDX 导播台</span>
+  <a href="/" data-nav="settings">设置 / 赛程</a>
+  <a href="/prep" data-nav="prep">回合准备</a>
+  <a href="/review" data-nav="review">比分确认</a>
+  <div class="scene-actions" id="scene-actions" aria-label="OBS 场景快捷切换"></div>
+  <span class="badges">
+    <span class="badge" id="badge-obs">OBS ✗</span>
+    <span class="badge" id="badge-monitor">监控 ✗</span>
+    <span class="badge" id="badge-mode">-</span>
+    <span class="badge badge-phase" id="badge-phase">-</span>
+  </span>
+</nav>
+<main>{% block content %}{% endblock %}</main>
+<div id="toast"></div>
+<script src="{{ url_for('static', filename='js/director.js') }}"></script>
+{% block script %}{% endblock %}
+</body>
+</html>
