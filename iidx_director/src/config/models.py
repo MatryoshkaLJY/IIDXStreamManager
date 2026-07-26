@@ -65,6 +65,7 @@ class TeamMatchConfig(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    play_type: Literal["SP", "DP"] = Field(default="SP", alias="playType")
     stage_name: str = Field(default="", alias="stageName")
     match_number: int = Field(default=1, alias="matchNumber")
     left_team: Team = Field(alias="leftTeam")
@@ -88,6 +89,7 @@ class KnockoutConfig(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
+    play_type: Literal["SP", "DP"] = Field(default="SP", alias="playType")
     tournament_name: str = Field(default="16人淘汰赛", alias="tournamentName")
     groups: dict[str, list[str]]
 

@@ -107,7 +107,7 @@ def default_service_specs(monorepo_root: Path) -> tuple[ServiceSpec, ...]:
             (sys.executable, str(monorepo_root / "iidx_bpl_scoreboard" / "server.py")),
             monorepo_root / "iidx_bpl_scoreboard",
             8080,
-            host="localhost",
+            host="127.0.0.1",
             protocol="websocket",
         ),
         ServiceSpec(
@@ -115,15 +115,15 @@ def default_service_specs(monorepo_root: Path) -> tuple[ServiceSpec, ...]:
             (sys.executable, str(monorepo_root / "iidx_knockout_scoreboard" / "server.py")),
             monorepo_root / "iidx_knockout_scoreboard",
             8081,
-            host="localhost",
+            host="127.0.0.1",
             protocol="websocket",
         ),
         ServiceSpec(
-            "sceneinfo",
-            (sys.executable, str(director_root / "sceneinfo" / "server.py")),
+            "overlay-relay",
+            (sys.executable, str(director_root / "overlay" / "server.py")),
             director_root,
             8082,
-            host="localhost",
+            host="127.0.0.1",
             protocol="websocket",
         ),
     )
@@ -164,16 +164,32 @@ class DependencyManager:
     def _start_one(self, spec: ServiceSpec) -> None:
         if not spec.cwd.is_dir():
             raise ServiceStartupError(f"服务 {spec.name} 工作目录不存在: {spec.cwd}")
+        executable = Path(spec.command[0])
+        if executable.is_absolute() and not executable.exists():
+            raise ServiceStartupError(f"服务 {spec.name} 找不到 Python 解释器: {spec.command[0]}")
         logger.info("启动服务 %s: %s", spec.name, " ".join(spec.command))
         try:
+            popen_kwargs = {
+                "cwd": str(spec.cwd),
+                "stdin": subprocess.DEVNULL,
+                "stdout": None,
+                "stderr": None,
+            }
+            if os.name == "nt":
+                # Keep children in a group so stop() can terminate only our tree.
+                popen_kwargs["creationflags"] = getattr(
+                    subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200
+                )
+            else:
+                popen_kwargs["start_new_session"] = True
             process = subprocess.Popen(
                 list(spec.command),
-                cwd=str(spec.cwd),
-                stdin=subprocess.DEVNULL,
-                start_new_session=(os.name != "nt"),
+                **popen_kwargs,
             )
         except OSError as exc:
-            raise ServiceStartupError(f"启动服务 {spec.name} 失败: {exc}") from exc
+            raise ServiceStartupError(
+                f"启动服务 {spec.name} 失败: {exc}。请确认已运行 install_windows.ps1 且模型/依赖完整。"
+            ) from exc
         self._owned[spec.name] = process
 
         deadline = time.monotonic() + self.startup_timeout
@@ -183,10 +199,18 @@ class DependencyManager:
                 return
             returncode = process.poll()
             if returncode is not None:
-                raise ServiceStartupError(f"服务 {spec.name} 提前退出，返回码: {returncode}")
+                hint = "请检查端口占用、模型文件和 Python 依赖。"
+                if spec.name == "state-reco":
+                    hint = "请确认 classifier.onnx、classifier.onnx.data 和 classifier.labels.txt 均存在。"
+                elif spec.name == "score-reco":
+                    hint = "请确认 font/ 和 rois.csv 存在且 OpenCV/Pillow 已安装。"
+                raise ServiceStartupError(
+                    f"服务 {spec.name} 提前退出，返回码: {returncode}。{hint}"
+                )
             time.sleep(0.1)
         raise ServiceStartupError(
-            f"服务 {spec.name} 启动超时（{spec.host}:{spec.port}，等待 {self.startup_timeout:g}s）"
+            f"服务 {spec.name} 启动超时（{spec.host}:{spec.port}，等待 {self.startup_timeout:g}s）。"
+            "端口可能被占用，或服务启动时缺少模型/依赖。"
         )
 
     def stop(self) -> None:
@@ -197,7 +221,10 @@ class DependencyManager:
             if process.poll() is not None:
                 continue
             logger.info("停止服务 %s", name)
-            process.terminate()
+            try:
+                process.terminate()
+            except OSError as exc:
+                logger.warning("停止服务 %s 失败: %s", name, exc)
         for name, process in processes:
             if process.poll() is not None:
                 continue

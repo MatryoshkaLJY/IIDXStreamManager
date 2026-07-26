@@ -1,4 +1,4 @@
 from .scoreboard import ScoreboardPusher
-from .sceneinfo import SceneInfoPusher
+from .overlay import OverlayPusher
 
-__all__ = ["SceneInfoPusher", "ScoreboardPusher"]
+__all__ = ["OverlayPusher", "ScoreboardPusher"]

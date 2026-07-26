@@ -18,6 +18,7 @@ def test_ensure_templates_and_load(tmp_path):
     team = load_team_match(tmp_path)
     ko = load_knockout(tmp_path)
     assert team.rounds and ko.groups["A"]
+    assert team.play_type == "SP" and ko.play_type == "SP"
 
 
 def test_load_missing_file(tmp_path):

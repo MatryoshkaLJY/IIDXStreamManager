@@ -19,6 +19,7 @@ TEAM_MATCH_FILE = "team_match.json"
 KNOCKOUT_FILE = "knockout.json"
 
 TEAM_MATCH_TEMPLATE = {
+    "playType": "SP",
     "stageName": "レギュラーステージ",
     "matchNumber": 1,
     "leftTeam": {
@@ -52,6 +53,7 @@ TEAM_MATCH_TEMPLATE = {
 }
 
 KNOCKOUT_TEMPLATE = {
+    "playType": "SP",
     "tournamentName": "16人淘汰赛",
     "groups": {
         "A": ["A1", "A2", "A3", "A4"],

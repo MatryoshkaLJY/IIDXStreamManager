@@ -22,8 +22,8 @@
       <label>游戏场景 <input id="scene-name" list="obs-scenes" style="width:180px"></label>
       <datalist id="obs-scenes"></datalist>
     </div>
-    <button class="big" onclick="beginRound()">✓ 确认开始比赛</button>
-    <div class="hint">确认后将：推送场景信息 → 进入抓分状态。OBS 场景请使用顶部快捷按钮手动切换。请先到「比分确认」页确认监控已启动。</div>
+    <button class="big" onclick="beginRound()">✓ 创建开始待应用</button>
+    <div class="hint">确认后将：写入 overlay、切换 OBS、进入抓分状态。请先确认监控已启动。</div>
   </div>
 </div>
 {% endblock %}
@@ -51,22 +51,36 @@ function renderRound(round, snap) {
   let title, detail = '';
   if (round.mode === 'team') {
     title = `${esc(round.left_team)} vs ${esc(round.right_team)} — 第 ${round.round_no}/${round.total_rounds} 回合`;
-    detail = `<p>类型 ${esc(round.type)}　主题 ${esc(round.theme || '-')}　分值 ${round.points}</p>
+    detail = `<p>${esc(round.play_type || 'SP')}　类型 ${esc(round.type)}　主题 ${esc(round.theme || '-')}　分值 ${round.points}</p>
       <p>${esc(round.left_players.join('、'))} 对阵 ${esc(round.right_players.join('、'))}</p>`;
-    if (!document.getElementById('scene-name').value) {
-      document.getElementById('scene-name').value = snap.scenes.team_sp || '';
-    }
+    const playType = round.play_type === 'DP' ? 'dp' : 'sp';
+    const sceneKey = `team_${playType}_${round.type === '2v2' ? '2v2' : '1v1'}`;
+    setDefaultScene(snap.scenes[sceneKey] || snap.scenes[`team_${playType}`] || snap.scenes.team_sp || '');
   } else {
     title = `淘汰赛 ${esc(round.group)} 组 — 第 ${round.round_no} 局${round.tiebreaker ? '（平局决胜）' : ''}`;
     detail = `<p>选手：${round.players.map(esc).join('、')}</p>`;
-    if (!document.getElementById('scene-name').value) {
-      document.getElementById('scene-name').value = snap.scenes.individual || '';
-    }
+    const sceneKey = round.play_type === 'DP' ? 'individual_dp' : 'individual_sp';
+    setDefaultScene(snap.scenes[sceneKey] || snap.scenes.individual_sp || snap.scenes.individual || '');
   }
   document.getElementById('round-title').textContent = title;
   document.getElementById('round-detail').innerHTML = detail;
   loadObsScenes();
 }
+
+function setDefaultScene(value) {
+  const input = document.getElementById('scene-name');
+  if (!input || (!input.value && !input.dataset.manual) || input.dataset.autoDefault === 'true') {
+    if (input) {
+      input.value = value;
+      input.dataset.autoDefault = 'true';
+    }
+  }
+}
+
+document.getElementById('scene-name').addEventListener('input', function () {
+  this.dataset.manual = 'true';
+  this.dataset.autoDefault = 'false';
+});
 
 function teamOf(player, round) {
   if (round.mode !== 'team') return '';
@@ -118,7 +132,9 @@ async function beginRound() {
   let resp = await postJSON('/api/round/assign', { assignments });
   if (!resp.success) return;
   resp = await postJSON('/api/round/begin', { scene: document.getElementById('scene-name').value });
-  if (resp.success) { toast('回合已开始，等待抓分'); window.location.href = '/review'; }
+  if (resp.success) {
+    toast('已创建回合场景待应用，请在顶部确认');
+  }
 }
 </script>
 {% endblock %}

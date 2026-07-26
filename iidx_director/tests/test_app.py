@@ -1,9 +1,13 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
-from src.app import create_app
+from src.app import _default_scene, create_app
+from src.config.models import KnockoutConfig, TeamMatchConfig
+from src.match.session import MatchSession
 from src.push.scoreboard import PushError
+from src.state import RuntimeState
 
 TEAM_CONFIG = {
     "stageName": "S",
@@ -33,7 +37,7 @@ class FakeScoreboardPusher:
             self.push(item["board"], item["payload"])
 
 
-class FakeSceneInfoPusher:
+class FakeOverlayPusher:
     def __init__(self):
         self.pushed = []
 
@@ -48,7 +52,7 @@ def env(tmp_path):
     app.config["TESTING"] = True
     ctx = app.config["CONTEXT"]
     ctx.scoreboard = FakeScoreboardPusher()
-    ctx.sceneinfo = FakeSceneInfoPusher()
+    ctx.overlay = FakeOverlayPusher()
     client = app.test_client()
     return app, client, ctx
 
@@ -77,6 +81,31 @@ def _feed_scores(ctx, machine_ex):
     for machine, sides in machine_ex.items():
         scores = {f"{side}score": str(ex) for side, ex in sides.items()}
         ctx.session.on_machine_scores(machine, scores)
+
+
+def test_default_scene_uses_schedule_play_type_and_round_type():
+    ctx = SimpleNamespace(state=RuntimeState())
+    config = TeamMatchConfig.model_validate({
+        "playType": "DP",
+        "leftTeam": {"name": "L", "players": ["L1", "L2"]},
+        "rightTeam": {"name": "R", "players": ["R1", "R2"]},
+        "rounds": [
+            {"type": "1v1", "leftPlayers": ["L1"], "rightPlayers": ["R1"]},
+            {"type": "2v2", "leftPlayers": ["L1", "L2"], "rightPlayers": ["R1", "R2"]},
+        ],
+    })
+    session = MatchSession("team", config)
+    session.start()
+    assert _default_scene(ctx, session) == "DP_BPL"
+    session.round_index = 1
+    assert _default_scene(ctx, session) == "DP_Arena"
+
+    knockout = MatchSession("knockout", KnockoutConfig.model_validate({
+        "playType": "DP",
+        "groups": {g: [f"{g}{i}" for i in range(1, 5)] for g in "ABCD"},
+    }))
+    knockout.start()
+    assert _default_scene(ctx, knockout) == "DP_Arena"
 
 
 # ---- 页面与基础 API ----
@@ -135,9 +164,9 @@ def test_team_match_full_api_flow(env):
     resp = _post(client, "/api/round/begin", {"scene": "SP团队赛"})
     assert resp["success"]
     assert resp["warnings"] == []
-    # sceneinfo round_start 已推送
-    assert ctx.sceneinfo.pushed[-1]["cmd"] == "round_start"
-    assert ctx.sceneinfo.pushed[-1]["data"]["template"] == "sp_bpl"
+    # overlay round_start 已推送
+    assert ctx.overlay.pushed[-1]["cmd"] == "round_start"
+    assert ctx.overlay.pushed[-1]["data"]["template"] == "sp_bpl"
 
     _feed_scores(ctx, {"IIDX#1": {"1p": 2000, "2p": 1500}})
     assert session.phase.value == "REVIEW"
@@ -146,7 +175,7 @@ def test_team_match_full_api_flow(env):
     assert resp["success"]
     board, payload = ctx.scoreboard.pushed[-1]
     assert payload == {"cmd": "score", "data": {"round": 1, "leftScore": 1, "rightScore": 0}}
-    assert ctx.sceneinfo.pushed[-1]["cmd"] == "round_result"
+    assert ctx.overlay.pushed[-1]["cmd"] == "round_result"
 
     resp = _post(client, "/api/round/advance")
     assert resp["success"] and not resp["match_end"]
@@ -230,6 +259,35 @@ def test_force_review_manual_entry(env):
     resp = _post(client, "/api/round/confirm", {"scores": {"L1": 2100, "R1": 1500}})
     assert resp["success"]
     assert ctx.scoreboard.pushed[-1][1]["data"] == {"round": 1, "leftScore": 1, "rightScore": 0}
+
+
+def test_test_mode_injects_machine_scores_and_blank_screenshot(env, tmp_path):
+    _, client, ctx = env
+    ctx.screenshots.root = tmp_path / "screenshots"
+    _upload_team_config(client)
+    assert _post(client, "/api/mode", {"mode": "team"})["success"]
+    assert _post(client, "/api/test-mode", {"enabled": True})["success"]
+    assert _post(client, "/api/match/start")["success"]
+    _post(client, "/api/round/assign", {
+        "assignments": {
+            "L1": {"machine": "IIDX#1", "side": "1p"},
+            "R1": {"machine": "IIDX#1", "side": "2p"},
+        }
+    })
+    _post(client, "/api/round/begin", {})
+
+    response = _post(client, "/api/test/scores", {
+        "machine_id": "IIDX#1",
+        "scores": {"1p": 2100, "2p": 1500},
+    })
+    assert response["success"] and response["phase"] == "REVIEW"
+    snap = client.get("/api/state").get_json()
+    image = client.get(snap["screenshots"]["IIDX#1"])
+    assert image.status_code == 200 and image.content_type == "image/png"
+    assert image.data
+
+    assert _post(client, "/api/match/abort")["success"]
+    assert _post(client, "/api/test-mode", {"enabled": False})["success"]
 
 
 def test_assign_without_match(env):

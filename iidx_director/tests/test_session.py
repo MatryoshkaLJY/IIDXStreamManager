@@ -79,6 +79,8 @@ def test_team_full_flow():
     assert s.phase == SessionPhase.PREP
     info = s.current_round_info()
     assert info["round_no"] == 1 and info["total_rounds"] == 2 and info["type"] == "1v1"
+    assert info["play_type"] == "SP"
+    assert s.snapshot()["play_type"] == "SP"
 
     _play_team_round(s, {"IIDX#1": {"1p": 2000, "2p": 1500}})
     result = s.review_info()
@@ -235,3 +237,14 @@ def test_knockout_stage_and_finals_group_payload():
     info = s.current_round_info()
     assert info["stage"] == "final" and info["group"] == "finals"
     assert len(info["players"]) == 4
+
+
+def test_dp_play_type_is_exposed_in_round_info_and_snapshot():
+    cfg = KnockoutConfig.model_validate(
+        {"playType": "DP", "groups": {g: [f"{g}{i}" for i in range(1, 5)] for g in "ABCD"}}
+    )
+    session = MatchSession("knockout", cfg)
+    session.start()
+    assert session.play_type == "DP"
+    assert session.current_round_info()["play_type"] == "DP"
+    assert session.snapshot()["play_type"] == "DP"

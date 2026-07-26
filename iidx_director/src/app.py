@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, render_template, request, send_file
+from flask import Flask, jsonify, render_template, request, send_file, send_from_directory
 from flask_socketio import SocketIO
 
 from .config import loader
@@ -23,8 +23,8 @@ from .config.loader import ConfigError
 from .match.session import MatchSession, SessionError, SessionPhase
 from .obs.client import OBSClient
 from .obs.monitor import CabinetMonitor
-from .push.sceneinfo import (
-    SceneInfoPusher,
+from .push.overlay import (
+    OverlayPusher,
     match_end_payload,
     round_result_payload,
     round_start_payload,
@@ -39,13 +39,15 @@ from .push.scoreboard import (
     knockout_reset_payload,
 )
 from .state import RuntimeState, load_runtime_state, save_runtime_state
+from .scene import PendingError, SceneCoordinator
 from .services import DependencyManager
-from .screenshots import ScreenshotStore, round_key_for_session
+from .screenshots import EMPTY_SCREENSHOT_PNG, ScreenshotStore, round_key_for_session
 
 logger = logging.getLogger(__name__)
 
 WEB_PORT = 5003
 SCOREBOARD_SETTLE_SECONDS = 5.0
+MONOREPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class AppContext:
@@ -53,15 +55,19 @@ class AppContext:
 
     def __init__(self, config_dir: Path | None = None) -> None:
         self.state: RuntimeState = load_runtime_state()
+        if os.environ.get("IIDX_TEST_MODE", "").strip().lower() in {"1", "true", "yes", "on"}:
+            self.state.test_mode = True
         self.config_dir = config_dir or loader.CONFIG_DIR
         loader.ensure_templates(self.config_dir)
         self.obs_password: str | None = os.environ.get("IIDX_OBS_PASSWORD")
         self.obs: OBSClient | None = None
         self.monitor: CabinetMonitor | None = None
         self.scoreboard = ScoreboardPusher()
-        self.sceneinfo = SceneInfoPusher()
+        self.overlay = OverlayPusher()
         self.session: MatchSession | None = None
         self.scene_template: str | None = None
+        self.scenes = SceneCoordinator(self.state.scenes)
+        self.current_scene: str | None = None
         self.screenshots = ScreenshotStore()
         self.sleep = time.sleep
         self.lock = threading.RLock()
@@ -141,14 +147,20 @@ class AppContext:
     # ---- 广播 ----
 
     def session_snapshot(self) -> dict[str, Any]:
+        self.scenes.update_aliases(self.state.scenes)
         return {
             "session": self.session.snapshot() if self.session else None,
             "obs_connected": self.obs_connected(),
             "monitor_running": self.monitor_running(),
             "mode": self.state.mode,
+            "test_mode": self.state.test_mode,
             "scenes": self.state.scenes,
+            "actual_scenes": list(self.scenes.snapshots),
             "machines": sorted(self.state.machines),
             "screenshots": self.screenshots.current_urls(self.session),
+            "scene": self.current_scene,
+            "scene_state": self.scenes.public_state(),
+            "pending": self.scenes.pending.to_dict() if self.scenes.pending else None,
         }
 
 
@@ -167,6 +179,89 @@ def create_app(config_dir: Path | None = None):
     def fail(message: str, **extra):
         return jsonify({"success": False, "error": message, **extra})
 
+    def _overlay_stage(pending) -> bool:
+        prior = ctx.scenes.snapshot(pending.scene)
+        snapshot = {
+            "template": pending.template,
+            "texts": pending.texts,
+            "hues": pending.hues,
+            "version": int(prior.get("version", 0)) + 1,
+        }
+        if hasattr(ctx.overlay, "stage"):
+            return bool(ctx.overlay.stage(pending.scene, snapshot))
+        return bool(ctx.overlay.push({
+            "cmd": "stage", "scene": pending.scene, "snapshot": snapshot,
+        }))
+
+    def _overlay_activate(scene: str) -> bool:
+        if hasattr(ctx.overlay, "activate"):
+            return bool(ctx.overlay.activate(scene))
+        return bool(ctx.overlay.push({"cmd": "activate", "scene": scene}))
+
+    def _execute_pending() -> tuple[bool, str | None, list[str]]:
+        """Apply the current pending transaction, retaining it on any failure."""
+        warnings: list[str] = []
+        pending = ctx.scenes.require_pending()
+        stage = pending.failed_stage
+        try:
+            if pending.status in ("pending", "failed") and pending.failed_stage in (None, "stage"):
+                stage = "stage"
+                if not _overlay_stage(pending):
+                    raise RuntimeError("overlay stage 未确认")
+                ctx.scenes.mark("staged")
+            if pending.status in ("staged", "failed") and pending.failed_stage in (None, "scene_switch"):
+                stage = "scene_switch"
+                if not ctx.obs_connected():
+                    raise RuntimeError("OBS 未连接")
+                if not ctx.try_switch_scene(pending.scene, warnings):
+                    raise RuntimeError(f"切换场景 {pending.scene} 失败")
+                ctx.scenes.mark("scene_switched")
+                ctx.current_scene = pending.scene
+            if pending.status in ("scene_switched", "failed") and pending.failed_stage in (None, "activate"):
+                stage = "activate"
+                if not _overlay_activate(pending.scene):
+                    raise RuntimeError("overlay activate 未确认")
+                ctx.scenes.mark("scene_switched")
+
+            action = pending.action
+            if action == "round_begin" and not pending.action_data.get("done"):
+                stage = "action"
+                session = _require_session()
+                if not pending.action_data.get("session_started"):
+                    session.begin_round()
+                    pending.action_data["session_started"] = True
+                start_payload = pending.action_data.get("start_payload")
+                if start_payload and ctx.overlay.push(start_payload) is False:
+                    raise RuntimeError("overlay round_start 推送失败")
+                pending.action_data["done"] = True
+            elif action == "scoreboard" and not pending.action_data.get("scoreboard_done"):
+                stage = "action"
+                ctx.sleep(SCOREBOARD_SETTLE_SECONDS)
+                ctx.scoreboard.push_all(pending.action_data.get("payloads", []))
+                pending.action_data["scoreboard_done"] = True
+            if action == "scoreboard" and pending.action_data.get("scoreboard_done") and not pending.action_data.get("result_done"):
+                stage = "action"
+                result_payload = pending.action_data.get("result_payload")
+                if result_payload and ctx.overlay.push(result_payload) is False:
+                    raise RuntimeError("overlay round_result 推送失败")
+                pending.action_data["result_done"] = True
+                if result_payload:
+                    source_scene = pending.source_scene
+                    data = result_payload.get("data", {})
+                    if source_scene:
+                        prior = ctx.scenes.snapshot(source_scene)
+                        ctx.scenes.set_snapshot(
+                            source_scene,
+                            data.get("template", prior["template"]),
+                            data.get("texts", prior["texts"]),
+                            data.get("hues", prior["hues"]),
+                        )
+            ctx.scenes.complete()
+            return True, None, warnings
+        except Exception as exc:
+            ctx.scenes.mark("failed", failed_stage=stage or pending.status, error=str(exc))
+            return False, str(exc), warnings
+
     # ---- 页面 ----
 
     @app.get("/")
@@ -180,6 +275,36 @@ def create_app(config_dir: Path | None = None):
     @app.get("/review")
     def page_review():
         return render_template("review.html")
+
+    @app.get("/overlay/")
+    def page_overlay():
+        overlay_root = Path(__file__).resolve().parents[1] / "overlay"
+        return send_file(overlay_root / "obs-overlay.html", mimetype="text/html")
+
+    @app.get("/overlay/<path:asset_path>")
+    def overlay_asset(asset_path: str):
+        overlay_root = Path(__file__).resolve().parents[1] / "overlay"
+        return send_from_directory(overlay_root, asset_path, max_age=0)
+
+    # Serving the scoreboard pages from the director avoids file:// URLs in
+    # OBS Browser Source and keeps all business endpoints on the loopback host.
+    @app.get("/scoreboard/bpl/")
+    def scoreboard_bpl_index():
+        return send_from_directory(MONOREPO_ROOT / "iidx_bpl_scoreboard", "index.html")
+
+    @app.get("/scoreboard/bpl/<path:asset_path>")
+    def scoreboard_bpl_asset(asset_path: str):
+        return send_from_directory(MONOREPO_ROOT / "iidx_bpl_scoreboard", asset_path, max_age=0)
+
+    @app.get("/scoreboard/knockout/")
+    def scoreboard_knockout_index():
+        return send_from_directory(MONOREPO_ROOT / "iidx_knockout_scoreboard", "index.html")
+
+    @app.get("/scoreboard/knockout/<path:asset_path>")
+    def scoreboard_knockout_asset(asset_path: str):
+        return send_from_directory(
+            MONOREPO_ROOT / "iidx_knockout_scoreboard", asset_path, max_age=0
+        )
 
     # ---- 状态 ----
 
@@ -243,6 +368,23 @@ def create_app(config_dir: Path | None = None):
         emit_session()
         return ok()
 
+    @app.post("/api/test-mode")
+    def api_test_mode():
+        enabled = request.get_json(force=True).get("enabled")
+        if not isinstance(enabled, bool):
+            return fail("测试模式开关必须是布尔值")
+        with ctx.lock:
+            if ctx.session is not None and ctx.session.phase != SessionPhase.IDLE:
+                return fail("比赛进行中不能切换测试模式")
+            if enabled and ctx.monitor_running():
+                # Test mode replaces cabinet capture only; keep the OBS
+                # connection available for scene queries and switching.
+                ctx.stop_monitor()
+            ctx.state.test_mode = enabled
+            save_runtime_state(ctx.state)
+        emit_session()
+        return ok(test_mode=enabled)
+
     @app.post("/api/config/upload")
     def api_config_upload():
         data = request.get_json(force=True)
@@ -274,6 +416,56 @@ def create_app(config_dir: Path | None = None):
             return fail(f"未知配置类型: {kind!r}")
         return jsonify(templates[kind])
 
+    # ---- 统一场景 pending 事务 ----
+
+    @app.get("/api/scene/pending")
+    def api_scene_pending_get():
+        return ok(pending=ctx.scenes.pending.to_dict() if ctx.scenes.pending else None)
+
+    @app.post("/api/scene/pending")
+    def api_scene_pending_create():
+        data = request.get_json(force=True)
+        requested = data.get("scene")
+        scene = ctx.scenes.resolve(requested)
+        if scene is None:
+            return fail("场景未配置")
+        template = data.get("template") or template_for_scene(scene, ctx.state.mode)
+        try:
+            with ctx.lock:
+                pending = ctx.scenes.create_pending(
+                    scene,
+                    template,
+                    data.get("texts"),
+                    data.get("hues"),
+                    source=str(data.get("source") or "shortcut"),
+                )
+        except PendingError as exc:
+            return fail(str(exc))
+        emit_session()
+        return ok(pending=pending.to_dict())
+
+    @app.post("/api/scene/pending/confirm")
+    def api_scene_pending_confirm():
+        with ctx.lock:
+            try:
+                success, error, warnings = _execute_pending()
+            except PendingError as exc:
+                return fail(str(exc))
+        emit_session()
+        if not success:
+            return fail(error or "场景应用失败", pending=True, warnings=warnings)
+        return ok(warnings=warnings)
+
+    @app.post("/api/scene/pending/cancel")
+    def api_scene_pending_cancel():
+        try:
+            with ctx.lock:
+                pending = ctx.scenes.cancel(request.get_json(force=True).get("id"))
+        except PendingError as exc:
+            return fail(str(exc))
+        emit_session()
+        return ok(cancelled=pending.to_dict())
+
     # ---- 比赛流程 ----
 
     @app.post("/api/match/start")
@@ -297,6 +489,7 @@ def create_app(config_dir: Path | None = None):
             session = MatchSession(ctx.state.mode, config)
             session.start()
             ctx.session = session
+            ctx.current_scene = None
             ctx.screenshots.start_match()
         emit_session()
         return ok()
@@ -308,6 +501,8 @@ def create_app(config_dir: Path | None = None):
                 return fail("没有进行中的比赛")
             ctx.session.abort()
             ctx.session = None
+            if ctx.scenes.pending is not None:
+                ctx.scenes.cancel()
         emit_session()
         return ok()
 
@@ -324,26 +519,38 @@ def create_app(config_dir: Path | None = None):
 
     @app.post("/api/round/begin")
     def api_round_begin():
-        warnings: list[str] = []
         with ctx.lock:
             session = _require_session()
             if set(session.assignments) != set(session.players_to_assign()):
                 return fail("尚未完成机台分配")
-            scene = request.get_json(force=True).get("scene") or _default_scene(ctx)
+            scene = request.get_json(force=True).get("scene") or _default_scene(ctx, session)
+            actual_scene = ctx.scenes.resolve(scene)
+            if actual_scene is None:
+                return fail("场景未配置")
             try:
-                ctx.scene_template = template_for_scene(scene, session.mode)
-                ctx.sceneinfo.push(round_start_payload(session, ctx.scene_template))
-                session.begin_round()
-            except SessionError as exc:
+                ctx.scene_template = template_for_scene(actual_scene, session.mode)
+                payload = round_start_payload(session, ctx.scene_template, actual_scene)
+                data = payload["data"]
+                pending = ctx.scenes.create_pending(
+                    actual_scene,
+                    ctx.scene_template,
+                    data.get("texts", {}),
+                    data.get("hues", {}),
+                    source="round_start",
+                    action="round_begin",
+                    action_data={"start_payload": payload},
+                )
+            except (SessionError, PendingError) as exc:
                 return fail(str(exc))
         emit_session()
-        return ok(warnings=warnings)
+        return ok(pending=pending.to_dict())
 
     @app.post("/api/round/confirm")
     def api_round_confirm():
-        warnings: list[str] = []
         with ctx.lock:
             session = _require_session()
+            if ctx.scenes.pending is not None:
+                return fail("已有待应用的场景操作，请先确认、取消或重试")
             scores = {
                 k: int(v) for k, v in request.get_json(force=True).get("scores", {}).items()
             }
@@ -351,14 +558,24 @@ def create_app(config_dir: Path | None = None):
                 payloads = session.confirm(scores)
             except (SessionError, ValueError) as exc:
                 return fail(str(exc))
+            scoreboard_scene = ctx.scenes.resolve(ctx.state.scenes.get("scoreboard"))
+            if scoreboard_scene is None:
+                return fail("计分板场景未配置")
+            result_scene = ctx.current_scene or ctx.scenes.resolve(_default_scene(ctx, session)) or "Live"
+            result_payload = round_result_payload(session, ctx.scene_template, result_scene)
             try:
-                ctx.switch_scoreboard_and_push(payloads, warnings)
-            except PushError as exc:
-                emit_session()
-                return fail(f"推送失败: {exc}（可用「重试推送」）", repush=True)
-            ctx.sceneinfo.push(round_result_payload(session, ctx.scene_template))
+                pending = ctx.scenes.create_pending(
+                    scoreboard_scene,
+                    template_for_scene(scoreboard_scene, session.mode),
+                    source="scoreboard",
+                    action="scoreboard",
+                    action_data={"payloads": payloads, "result_payload": result_payload},
+                    source_scene=result_scene,
+                )
+            except PendingError as exc:
+                return fail(str(exc))
         emit_session()
-        return ok(warnings=warnings)
+        return ok(pending=pending.to_dict(), repush=True)
 
     @app.post("/api/round/force_review")
     def api_round_force_review():
@@ -377,29 +594,52 @@ def create_app(config_dir: Path | None = None):
 
     @app.post("/api/round/repush")
     def api_round_repush():
-        warnings: list[str] = []
         with ctx.lock:
             session = _require_session()
             if not session.last_payloads:
                 return fail("没有待重推的载荷")
-            try:
-                ctx.switch_scoreboard_and_push(session.last_payloads, warnings)
-            except PushError as exc:
-                return fail(f"推送仍失败: {exc}", repush=True)
+            if ctx.scenes.pending is None:
+                scoreboard_scene = ctx.scenes.resolve(ctx.state.scenes.get("scoreboard"))
+                if scoreboard_scene is None:
+                    return fail("计分板场景未配置")
+                try:
+                    pending = ctx.scenes.create_pending(
+                        scoreboard_scene,
+                        template_for_scene(scoreboard_scene, session.mode),
+                        source="scoreboard",
+                        action="scoreboard",
+                        action_data={"payloads": session.last_payloads},
+                    )
+                except PendingError as exc:
+                    return fail(str(exc))
+            else:
+                pending = ctx.scenes.pending
         emit_session()
-        return ok(warnings=warnings)
+        return ok(pending=pending.to_dict())
 
     @app.post("/api/round/advance")
     def api_round_advance():
         with ctx.lock:
             session = _require_session()
+            if ctx.scenes.pending is not None:
+                return fail("已有待应用的场景操作，请先确认或取消")
             try:
                 session.advance()
             except SessionError as exc:
                 return fail(str(exc))
             ended = session.phase == SessionPhase.MATCH_END
             if ended:
-                ctx.sceneinfo.push(match_end_payload(session, ctx.scene_template))
+                payload = match_end_payload(session, ctx.scene_template, ctx.current_scene or "Live")
+                ctx.overlay.push(payload)
+                data = payload.get("data", {})
+                if ctx.current_scene:
+                    prior = ctx.scenes.snapshot(ctx.current_scene)
+                    ctx.scenes.set_snapshot(
+                        ctx.current_scene,
+                        ctx.scene_template or template_for_scene(ctx.current_scene, session.mode),
+                        data.get("texts", prior["texts"]),
+                        data.get("hues", prior["hues"]),
+                    )
         emit_session()
         return ok(match_end=ended)
 
@@ -420,13 +660,20 @@ def create_app(config_dir: Path | None = None):
         requested = request.get_json(force=True).get("scene")
         if not isinstance(requested, str) or not requested:
             return fail("缺少场景名")
-        configured = {key: value for key, value in ctx.state.scenes.items() if value}
-        scene = configured.get(requested, requested if requested in configured.values() else None)
+        scene = ctx.scenes.resolve(requested)
         if scene is None:
             return fail("场景未配置")
-        warnings: list[str] = []
-        ctx.try_switch_scene(scene, warnings)
-        return ok(scene=scene, warnings=warnings)
+        try:
+            with ctx.lock:
+                pending = ctx.scenes.create_pending(
+                    scene,
+                    template_for_scene(scene, ctx.state.mode),
+                    source="shortcut",
+                )
+        except PendingError as exc:
+            return fail(str(exc))
+        emit_session()
+        return ok(scene=scene, pending=pending.to_dict())
 
     # ---- 监控 ----
 
@@ -435,6 +682,8 @@ def create_app(config_dir: Path | None = None):
         action = request.get_json(force=True).get("action")
         try:
             if action == "start":
+                if ctx.state.test_mode:
+                    return ok(test_mode=True, message="测试模式无需启动机台监控")
                 ctx.start_monitor(_on_scores, _on_update, _on_score_frame)
             elif action == "stop":
                 ctx.stop_monitor()
@@ -444,6 +693,50 @@ def create_app(config_dir: Path | None = None):
             return fail(f"监控{action}失败: {exc}")
         emit_session()
         return ok()
+
+    @app.post("/api/test/score")
+    @app.post("/api/test/scores")
+    def api_test_scores():
+        """测试模式直接注入某台机台的 1P/2P 成绩，并生成空白截图。"""
+        data = request.get_json(force=True)
+        machine_id = data.get("machine_id")
+        if not isinstance(machine_id, str) or not machine_id:
+            return fail("缺少机台编号")
+        if not ctx.state.test_mode:
+            return fail("测试模式未启用")
+        raw_scores = data.get("scores", data)
+        if not isinstance(raw_scores, dict):
+            return fail("成绩格式无效")
+        scores: dict[str, str] = {}
+        for side in ("1p", "2p"):
+            raw = raw_scores.get(f"{side}score", raw_scores.get(side))
+            if raw is None or raw == "":
+                continue
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                return fail(f"{side.upper()} 分数无效")
+            if value < 0:
+                return fail(f"{side.upper()} 分数不能为负")
+            scores[f"{side}score"] = str(value)
+        if not scores:
+            return fail("至少填写一个 1P 或 2P 分数")
+        with ctx.lock:
+            session = _require_session()
+            if session.phase != SessionPhase.LIVE:
+                return fail(f"当前状态 {session.phase.value} 不能注入测试成绩")
+            assigned_machines = {slot["machine"] for slot in session.assignments.values()}
+            if machine_id not in assigned_machines:
+                return fail("该机台未分配给当前回合")
+            ctx.save_score_screenshot(machine_id, EMPTY_SCREENSHOT_PNG)
+            transitioned = session.on_machine_scores(machine_id, scores)
+        socketio.emit(
+            "cabinet_update",
+            {"machine_id": machine_id, "label": "测试模式", "state": "RESULT", "scores": scores},
+        )
+        if transitioned:
+            emit_session()
+        return ok(machine_id=machine_id, scores=scores, phase=session.phase.value)
 
     # ---- 监控回调（monitor 线程） ----
 
@@ -488,10 +781,26 @@ def create_app(config_dir: Path | None = None):
     return app, socketio
 
 
-def _default_scene(ctx: AppContext) -> str | None:
+def _default_scene(ctx: AppContext, session: MatchSession | None = None) -> str | None:
     """按模式给默认游戏场景；导播可在 PREP 页面改选。"""
     scenes = ctx.state.scenes
-    return scenes.get("team_sp") if ctx.state.mode == "team" else scenes.get("individual")
+    mode = session.mode if session is not None else ctx.state.mode
+    play_type = session.play_type if session is not None else "SP"
+    play_type = "DP" if play_type == "DP" else "SP"
+    if mode == "team":
+        round_type = session.current_round_info().get("type") if session else "1v1"
+        key = f"team_{play_type.lower()}_{'2v2' if round_type == '2v2' else '1v1'}"
+        return (
+            scenes.get(key)
+            or scenes.get(f"team_{play_type.lower()}")
+            or scenes.get("team_sp_1v1")
+            or scenes.get("team_sp")
+        )
+    return (
+        scenes.get(f"individual_{play_type.lower()}")
+        or scenes.get("individual_sp")
+        or scenes.get("individual")
+    )
 
 
 app, socketio = create_app()
@@ -517,10 +826,11 @@ def main() -> None:
             dependencies = DependencyManager(Path(__file__).resolve().parents[2])
             dependencies.start()
             signal.signal(signal.SIGTERM, _handle_sigterm)
-        print(f"导播台 @ http://localhost:{WEB_PORT}")
+        host = os.environ.get("IIDX_DIRECTOR_HOST", "127.0.0.1")
+        print(f"导播台 @ http://{host}:{WEB_PORT}")
         socketio.run(
             app,
-            host="0.0.0.0",
+            host=host,
             port=WEB_PORT,
             allow_unsafe_werkzeug=True,
             use_reloader=False,

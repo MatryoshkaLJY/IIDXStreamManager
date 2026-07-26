@@ -74,6 +74,11 @@ class MatchSession:
     # ---- 状态查询 ----
 
     @property
+    def play_type(self) -> str:
+        """当前赛程的游玩类型；旧配置缺省为 SP。"""
+        return self.config.play_type
+
+    @property
     def group(self) -> str:
         return GROUP_SEQUENCE[self.group_index]
 
@@ -92,6 +97,7 @@ class MatchSession:
             rnd = cfg.rounds[self.round_index]
             return {
                 "mode": "team",
+                "play_type": cfg.play_type,
                 "round_no": self.round_index + 1,
                 "total_rounds": len(cfg.rounds),
                 "type": rnd.type,
@@ -107,6 +113,7 @@ class MatchSession:
         group = self.group
         return {
             "mode": "knockout",
+            "play_type": self.config.play_type,
             "group": group,
             "stage": self.tournament.stage_of(group),
             "round_no": self.tournament.rounds_played[group] + 1,
@@ -130,6 +137,7 @@ class MatchSession:
             summary["final_ranking"] = self.tournament.final_ranking
         return {
             "mode": self.mode,
+            "play_type": self.play_type,
             "phase": self.phase.value,
             "round": info,
             "assignments": self.assignments,

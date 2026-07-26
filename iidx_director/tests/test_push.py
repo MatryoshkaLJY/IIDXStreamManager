@@ -4,9 +4,9 @@ import pytest
 
 from src.config.models import KnockoutConfig, TeamMatchConfig
 from src.match.session import MatchSession
-from src.push import sceneinfo
-from src.push.sceneinfo import (
-    SceneInfoPusher,
+from src.push.overlay import (
+    OverlayPusher,
+    hue_for_color,
     match_end_payload,
     round_start_payload,
     template_for_scene,
@@ -157,7 +157,7 @@ def test_round_start_payload_team():
     assert entries["R1"]["color"] == "#1a3a6b"
 
 
-def test_sceneinfo_template_and_text_fields():
+def test_overlay_template_and_text_fields():
     session = MatchSession("team", _team_config())
     session.start()
     session.set_assignments(
@@ -177,11 +177,35 @@ def test_sceneinfo_template_and_text_fields():
     }
 
 
+def test_dp_default_scenes_select_dp_overlay_templates():
+    cfg = TeamMatchConfig.model_validate(
+        {
+            "playType": "DP",
+            "leftTeam": {"name": "L", "players": ["L1"]},
+            "rightTeam": {"name": "R", "players": ["R1"]},
+            "rounds": [{"type": "1v1", "leftPlayers": ["L1"], "rightPlayers": ["R1"]}],
+        }
+    )
+    session = MatchSession("team", cfg)
+    session.start()
+    session.set_assignments(
+        {"L1": {"machine": "IIDX#1", "side": "1p"}, "R1": {"machine": "IIDX#1", "side": "2p"}}
+    )
+    assert template_for_scene("DP_BPL", session.mode) == "dp_bpl"
+    payload = round_start_payload(session, "dp_bpl", "DP_BPL")
+    assert payload["data"]["template"] == "dp_bpl"
+
+
 def test_template_for_scene():
     assert template_for_scene("DP团队赛", "team") == "dp_bpl"
     assert template_for_scene("SP团队赛", "team") == "sp_bpl"
+    assert template_for_scene("SP_BPL", "team") == "sp_bpl"
+    assert template_for_scene("SP_Arena", "team") == "sp_arena"
+    assert template_for_scene("DP_BPL", "team") == "dp_bpl"
+    assert template_for_scene("DP_Arena", "team") == "dp_arena"
     assert template_for_scene("个人赛", "knockout") == "sp_arena"
     assert template_for_scene("现场摄像", "team") == "live"
+    assert template_for_scene("Live", "team") == "live"
 
 
 def test_match_end_payload():
@@ -200,6 +224,29 @@ def test_match_end_payload():
     assert payload["data"]["rounds"][0]["winner"] == "left"
 
 
-def test_sceneinfo_push_failure_returns_false():
-    pusher = SceneInfoPusher(uri="ws://127.0.0.1:1", timeout=0.5)
+def test_overlay_push_failure_returns_false():
+    pusher = OverlayPusher(uri="ws://127.0.0.1:1", timeout=0.5)
     assert pusher.push({"cmd": "round_start"}) is False
+
+
+def test_overlay_hue_color_conversion():
+    assert hue_for_color("#ff0000") == 0.0
+    assert hue_for_color("#ffff00") == 60.0
+    assert hue_for_color("#00ff00") == 120.0
+    assert hue_for_color("#0000ff") == 240.0
+    assert hue_for_color("#888888") == 0.0
+
+
+def test_knockout_overlay_hues_follow_machine_colors():
+    cfg = KnockoutConfig.model_validate(
+        {"groups": {group: [f"{group}{i}" for i in range(1, 5)] for group in "ABCD"}}
+    )
+    session = MatchSession("knockout", cfg)
+    session.start()
+    payload = round_start_payload(session, "sp_arena")
+    assert payload["data"]["hues"] == {
+        "machine_1": 0.0,
+        "machine_2": 60.0,
+        "machine_3": 120.0,
+        "machine_4": 240.0,
+    }

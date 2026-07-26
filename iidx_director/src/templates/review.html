@@ -10,6 +10,10 @@
   <div class="card">
     <h2 id="live-title">比赛进行中</h2>
     <div class="cabinet-grid" id="cabinet-grid"></div>
+    <div id="test-score-panel" class="test-score-panel hidden">
+      <h3>测试模式：模拟机台出分</h3>
+      <div id="test-score-forms"></div>
+    </div>
     <div class="hint">状态机触发抓分后自动进入确认环节。若长时间无反应，请检查机台画面与识别服务。</div>
     <div style="margin-top:14px">
       <button class="secondary" onclick="toggleManual()">抓分失败？手动录入</button>
@@ -33,7 +37,7 @@
     </table>
     <div class="verdict" id="verdict"></div>
     <div class="row">
-      <button class="big" id="confirm-score-btn" onclick="confirmScores()">✓ 切换计分板并写入</button>
+      <button class="big" id="confirm-score-btn" onclick="confirmScores()">✓ 创建计分板待应用</button>
     </div>
   </div>
 </div>
@@ -76,12 +80,17 @@ window.onSessionUpdate = function (snap) {
     manualPlayers = session.round ? session.round.players : [];
     renderLiveTitle(session.round);
     renderCabinets(snap);
+    renderTestScorePanel(session, snap);
   } else if (phase === 'REVIEW') {
     document.getElementById('review-area').classList.remove('hidden');
     renderReview(session, snap);
   } else if (phase === 'PUSHED') {
     document.getElementById('pushed-area').classList.remove('hidden');
     document.getElementById('pushed-verdict').innerHTML = verdictHtml(session.last_result);
+    const waiting = !!snap.pending;
+    document.querySelector('#pushed-area h2').textContent = waiting ? '等待应用计分板' : '已写入计分板';
+    document.getElementById('repush-btn').classList.toggle('hidden', waiting);
+    document.querySelector('#pushed-area button.big').disabled = waiting;
   } else if (phase === 'MATCH_END') {
     document.getElementById('end-area').classList.remove('hidden');
     renderEnd(session);
@@ -142,6 +151,47 @@ function renderCabinets(snap) {
     div.id = 'cab-' + cssSafe(m);
     div.innerHTML = `<div class="mid">${esc(m)}</div><div class="st">-</div>`;
     grid.appendChild(div);
+  }
+}
+
+function renderTestScorePanel(session, snap) {
+  const panel = document.getElementById('test-score-panel');
+  panel.classList.toggle('hidden', !snap.test_mode);
+  if (!snap.test_mode) return;
+  const forms = document.getElementById('test-score-forms');
+  const machines = [...new Set(Object.values(session.assignments).map(slot => slot.machine))];
+  forms.innerHTML = '';
+  for (const machine of machines) {
+    const players = Object.entries(session.assignments)
+      .filter(([, slot]) => slot.machine === machine)
+      .map(([player, slot]) => `${esc(slot.side)}: ${esc(player)}`).join('，');
+    const row = document.createElement('div');
+    row.className = 'test-score-row';
+    row.innerHTML = `
+      <b>${esc(machine)}</b><span>${players}</span>
+      <label>1P <input class="test-score-input" data-side="1p" type="number" min="0"></label>
+      <label>2P <input class="test-score-input" data-side="2p" type="number" min="0"></label>
+      <button type="button">提交</button>`;
+    row.querySelector('button').onclick = () => submitTestScores(machine, row);
+    forms.appendChild(row);
+  }
+}
+
+async function submitTestScores(machine, row) {
+  const scores = {};
+  row.querySelectorAll('.test-score-input').forEach(input => {
+    if (input.value !== '') scores[input.dataset.side] = parseInt(input.value);
+  });
+  if (!Object.keys(scores).length || Object.values(scores).some(Number.isNaN)) {
+    toast('请至少填写一个有效分数', true);
+    return;
+  }
+  const button = row.querySelector('button');
+  setButtonBusy(button, true, '提交中…');
+  try {
+    await postJSON('/api/test/scores', { machine_id: machine, scores });
+  } finally {
+    setButtonBusy(button, false);
   }
 }
 
@@ -214,7 +264,7 @@ async function confirmScores() {
   setButtonBusy(button, true, '切换计分板并等待…');
   try {
     const resp = await postJSON('/api/round/confirm', { scores });
-    if (resp.success) toast('已写入记分板');
+    if (resp.success) toast('已创建计分板待应用，请在顶部确认');
   } finally {
     setButtonBusy(button, false);
   }
@@ -225,7 +275,7 @@ async function repush() {
   setButtonBusy(button, true, '等待计分板动画…');
   try {
     const resp = await postJSON('/api/round/repush');
-    if (resp.success) toast('重推成功');
+    if (resp.success) toast('已创建重推待应用，请在顶部确认');
   } finally {
     setButtonBusy(button, false);
   }

@@ -1,0 +1,1372 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>OBS Overlay</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        font-family: Arial, sans-serif;
+      }
+
+      #stage {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: transparent;
+      }
+
+      .transparent-mode,
+      .transparent-mode body,
+      .transparent-mode #stage {
+        background: transparent;
+      }
+
+      @font-face {
+        font-family: FZChaoCuHei;
+        src: url("FZCCHJW.TTF") format("truetype");
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: FZLanTingHei;
+        src: url("%E5%85%B0%E4%BA%AD%E7%89%B9%E9%BB%91%E7%AE%80.TTF")
+          format("truetype");
+        font-display: swap;
+      }
+
+      #canvas {
+        position: absolute;
+        width: 1920px;
+        height: 1080px;
+        transform-origin: top left;
+      }
+
+      .asset {
+        position: absolute;
+        display: block;
+        transform-origin: top left;
+        filter: hue-rotate(var(--hue, 0deg));
+      }
+
+      .text {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        box-sizing: border-box;
+        white-space: pre-wrap;
+        overflow: visible;
+        outline: none;
+        line-height: normal;
+      }
+
+      #editor {
+        position: fixed;
+        z-index: 9999;
+        top: 12px;
+        right: 12px;
+        width: min(360px, calc(100vw - 24px));
+        max-height: calc(100vh - 24px);
+        overflow: auto;
+        background: rgba(15, 18, 24, 0.96);
+        color: #fff;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        font:
+          12px/1.4 Arial,
+          sans-serif;
+        display: none;
+      }
+
+      #editor h1 {
+        font-size: 14px;
+        margin: 0 0 10px;
+      }
+      .row {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin: 6px 0;
+      }
+      select,
+      input {
+        font: inherit;
+        box-sizing: border-box;
+      }
+      select {
+        width: 100%;
+        padding: 5px;
+        background: #222;
+        color: #fff;
+        border: 1px solid #444;
+      }
+      .item {
+        border-top: 1px solid #333;
+        padding: 8px 0;
+      }
+      .item label {
+        display: block;
+        color: #aaa;
+        margin-bottom: 4px;
+      }
+      .item input[type="text"] {
+        width: 100%;
+        padding: 5px;
+        background: #111;
+        color: #fff;
+        border: 1px solid #444;
+      }
+      .item input[type="range"] {
+        width: 100%;
+      }
+      .text-options {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 5px;
+      }
+      .text-options label {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin: 0;
+        color: #fff;
+      }
+      .text-size {
+        width: 72px;
+        padding: 3px;
+        background: #111;
+        color: #fff;
+        border: 1px solid #444;
+      }
+      .muted {
+        color: #888;
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"><div id="canvas"></div></div>
+    <aside id="editor">
+      <h1>OBS Overlay Editor</h1>
+      <div class="row"><select id="preset"></select></div>
+      <div id="controls"></div>
+      <div class="muted">
+        透明画布 1920 × 1080。默认隐藏编辑面板；OBS 使用不带
+        <code>?edit=1</code> 的地址。
+      </div>
+    </aside>
+    <script>
+      const presets = [
+        {
+          id: "dp-arena",
+          label: "DP Arena",
+          size: [1920, 1080],
+          images: [
+            {
+              id: "dp-arena-image-0",
+              name: "题头背景",
+              group: ["题头"],
+              box: [0.0, 0.0, 1518.0, 71.0],
+              src: "overlay-assets/dp-arena-0.png",
+            },
+            {
+              id: "dp-arena-image-1",
+              name: "红名板",
+              group: ["1号机"],
+              box: [13.0, 112.0, 308.0, 163.0],
+              src: "overlay-assets/dp-arena-1.png",
+            },
+            {
+              id: "dp-arena-image-2",
+              name: "红名板",
+              group: ["2号机"],
+              box: [1227.0, 112.0, 1522.0, 163.0],
+              src: "overlay-assets/dp-arena-2.png",
+            },
+            {
+              id: "dp-arena-image-3",
+              name: "红名板",
+              group: ["3号机"],
+              box: [13.0, 596.0, 308.0, 647.0],
+              src: "overlay-assets/dp-arena-3.png",
+            },
+            {
+              id: "dp-arena-image-4",
+              name: "红名板",
+              group: ["4号机"],
+              box: [1227.0, 596.0, 1522.0, 647.0],
+              src: "overlay-assets/dp-arena-4.png",
+            },
+          ],
+          texts: [
+            {
+              id: "dp-arena-text-0",
+              name: "TPL S3",
+              text: "TPL S3",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [9.36, 0.0, 168.24, 60.0],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-1",
+              name: "DP个人赛",
+              text: "DP个人赛",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [230.0, 0.0, 400.0, 55.0],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36.349,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-2",
+              name: "ROUND 1",
+              text: "ROUND 1",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1045.68, 0.0, 1250.00, 55.0],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-3",
+              name: "SCRATCH",
+              text: "SCRATCH",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1280, 0.0, 1450.00, 55.0],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-4",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["1号机"],
+              box: [54.667, 112.0, 247.167, 163.0],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 38.692,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-5",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["2号机"],
+              box: [1285.667, 112.0, 1461.167, 163.0],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 38.692,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-6",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["3号机"],
+              box: [54.667, 596.0, 247.167, 647.0],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 38.692,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-arena-text-7",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["4号机"],
+              box: [1285.667, 596.0, 1461.167, 647.0],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 38.692,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+          ],
+        },
+        {
+          id: "dp-bpl",
+          label: "DP BPL",
+          size: [8000, 4500],
+          images: [
+            {
+              id: "dp-bpl-image-0",
+              name: "题头背景",
+              group: ["题头"],
+              box: [226.56, -0.48, 1698.0, 89.76],
+              src: "overlay-assets/dp-bpl-0.png",
+            },
+            {
+              id: "dp-bpl-image-1",
+              name: "红板长",
+              group: ["左边", "左边队伍名"],
+              box: [506.16, 148.8, 726.72, 194.64],
+              src: "overlay-assets/dp-bpl-1.png",
+            },
+            {
+              id: "dp-bpl-image-2",
+              name: "红板",
+              group: ["左边", "左边分数"],
+              box: [541.44, 99.12, 726.72, 144.96],
+              src: "overlay-assets/dp-bpl-2.png",
+            },
+            {
+              id: "dp-bpl-image-3",
+              name: "红名板",
+              group: ["左边", "左边队员名"],
+              box: [127.44, 121.44, 550.8, 194.4],
+              src: "overlay-assets/dp-bpl-3.png",
+            },
+            {
+              id: "dp-bpl-image-4",
+              name: "红板长",
+              group: ["右边", "右边队伍名"],
+              box: [1205.28, 148.8, 1425.84, 194.64],
+              src: "overlay-assets/dp-bpl-4.png",
+            },
+            {
+              id: "dp-bpl-image-5",
+              name: "红板",
+              group: ["右边", "右边分数"],
+              box: [1205.28, 99.12, 1390.56, 144.96],
+              src: "overlay-assets/dp-bpl-5.png",
+            },
+            {
+              id: "dp-bpl-image-6",
+              name: "红名板",
+              group: ["右边", "右边队员名"],
+              box: [1378.32, 121.2, 1804.32, 194.64],
+              src: "overlay-assets/dp-bpl-6.png",
+            },
+          ],
+          texts: [
+            {
+              id: "dp-bpl-text-0",
+              name: "TPL S3",
+              text: "TPL S3",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [250, 0, 410.8, 90],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-1",
+              name: "DP团队赛",
+              text: "DP团队赛",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [460, 0, 800, 72],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-2",
+              name: "ROUND 1",
+              text: "ROUND 1",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1220.24, 0, 1500.24, 72],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-3",
+              name: "SCRATCH",
+              text: "SCRATCH",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1451.76, 0, 1800.4, 72],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-4",
+              name: "左边队名",
+              text: "左边队名",
+              visibleInPsd: false,
+              group: ["左边", "左边队伍名"],
+              box: [565.553, 148.8, 706.126, 194.64],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 34,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-5",
+              name: "29PT",
+              text: "29PT",
+              visibleInPsd: false,
+              group: ["左边", "左边分数"],
+              box: [590, 99.12, 689.127, 146],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-6",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["左边", "左边队员名"],
+              box: [187.237, 121.44, 600, 194.4],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-7",
+              name: "右边队名",
+              text: "右边队名",
+              visibleInPsd: false,
+              group: ["右边", "右边队伍名"],
+              box: [1231.246, 150, 1500, 195],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 34,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-8",
+              name: "30PT",
+              text: "30PT",
+              visibleInPsd: false,
+              group: ["右边", "右边分数"],
+              box: [1235, 99.12, 1324.921, 144.96],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "dp-bpl-text-9",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["右边", "右边队员名"],
+              box: [1460, 121.2, 1800, 195],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 36,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+          ],
+        },
+        {
+          id: "sp-arena",
+          label: "SP Arena",
+          size: [8006, 4500],
+          images: [
+            {
+              id: "sp-arena-image-0",
+              name: "黑色底板",
+              group: ["题头"],
+              box: [0.0, 0.0, 1920.0, 90.0],
+              src: "overlay-assets/sp-arena-0.png",
+            },
+            {
+              id: "sp-arena-image-1",
+              name: "红名板",
+              group: ["1号机"],
+              box: [10.792, 113.04, 332.631, 168.72],
+              src: "overlay-assets/sp-arena-1.png",
+            },
+            {
+              id: "sp-arena-image-2",
+              name: "红名板",
+              group: ["2号机"],
+              box: [391.866, 113.04, 713.705, 168.72],
+              src: "overlay-assets/sp-arena-2.png",
+            },
+            {
+              id: "sp-arena-image-3",
+              name: "红名板",
+              group: ["3号机"],
+              box: [1153.775, 113.04, 1475.613, 168.72],
+              src: "overlay-assets/sp-arena-3.png",
+            },
+            {
+              id: "sp-arena-image-4",
+              name: "红名板",
+              group: ["4号机"],
+              box: [1534.849, 113.04, 1856.687, 168.72],
+              src: "overlay-assets/sp-arena-4.png",
+            },
+          ],
+          texts: [
+            {
+              id: "sp-arena-text-0",
+              name: "TPL S3",
+              text: "TPL S3",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [13, 0.0, 200, 90.0],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-1",
+              name: "SP个人赛",
+              text: "SP个人赛",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [220, 0.0, 600, 71],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-2",
+              name: "ROUND 1",
+              text: "ROUND 1",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1435, 0.0, 1920, 71],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-3",
+              name: "SCRATCH",
+              text: "SCRATCH",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1670, 0.0, 1920, 71],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 40,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-4",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["1号机"],
+              box: [56.249, 113.04, 1920, 168.72],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-5",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["2号机"],
+              box: [437.324, 113.04, 1920, 168.72],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-6",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["3号机"],
+              box: [1199.232, 113.04, 1920, 168.72],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-arena-text-7",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["4号机"],
+              box: [1580.306, 113.04, 1920, 168.72],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+          ],
+        },
+        {
+          id: "sp-bpl",
+          label: "SP BPL",
+          size: [8000, 4500],
+          images: [
+            {
+              id: "sp-bpl-image-0",
+              name: "题头背景",
+              group: ["题头"],
+              box: [0.0, 0.0, 1398.72, 65.52],
+              src: "overlay-assets/sp-bpl-0.png",
+            },
+            {
+              id: "sp-bpl-image-1",
+              name: "红板长",
+              group: ["左边", "左边队伍名"],
+              box: [332.16, 108.24, 509.52, 145.44],
+              src: "overlay-assets/sp-bpl-1.png",
+            },
+            {
+              id: "sp-bpl-image-2",
+              name: "红板",
+              group: ["左边", "左边分数"],
+              box: [360.48, 68.64, 509.52, 105.6],
+              src: "overlay-assets/sp-bpl-2.png",
+            },
+            {
+              id: "sp-bpl-image-3",
+              name: "红名板",
+              group: ["左边", "左边队员名"],
+              box: [29.76, 86.4, 369.6, 145.2],
+              src: "overlay-assets/sp-bpl-3.png",
+            },
+            {
+              id: "sp-bpl-image-4",
+              name: "红板长",
+              group: ["右边", "右边队伍名"],
+              box: [893.04, 108.24, 1070.4, 145.44],
+              src: "overlay-assets/sp-bpl-4.png",
+            },
+            {
+              id: "sp-bpl-image-5",
+              name: "红板",
+              group: ["右边", "右边分数"],
+              box: [893.28, 68.64, 1042.32, 105.6],
+              src: "overlay-assets/sp-bpl-5.png",
+            },
+            {
+              id: "sp-bpl-image-6",
+              name: "红名板",
+              group: ["右边", "右边队员名"],
+              box: [1031.28, 86.16, 1373.04, 145.44],
+              src: "overlay-assets/sp-bpl-6.png",
+            },
+          ],
+          texts: [
+            {
+              id: "sp-bpl-text-0",
+              name: "TPL S3",
+              text: "TPL S3",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [20, 0.0, 500, 60],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-1",
+              name: "SP团队赛",
+              text: "SP团队赛",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [190, 0.0, 500, 54],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-2",
+              name: "ROUND 1",
+              text: "ROUND 1",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1050, 0.0, 1920, 54],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 28,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-3",
+              name: "SCRATCH",
+              text: "SCRATCH",
+              visibleInPsd: false,
+              group: ["题头"],
+              box: [1225.2, 0.0, 1920, 54],
+              style: {
+                fontFamily:
+                  '"FZChaoCuHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 28,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-4",
+              name: "左边队名",
+              text: "左边队名",
+              visibleInPsd: false,
+              group: ["左边", "左边队伍名"],
+              box: [379.92, 108.24, 492.96, 145.44],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 24,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-5",
+              name: "29PT",
+              text: "29PT",
+              visibleInPsd: false,
+              group: ["左边", "左边分数"],
+              box: [405, 70, 479.28, 105.6],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 24,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-6",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["左边", "左边队员名"],
+              box: [77.76, 86.4, 400, 145.2],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-7",
+              name: "右边队名",
+              text: "右边队名",
+              visibleInPsd: false,
+              group: ["右边", "右边队伍名"],
+              box: [920, 108.24, 1100, 145.44],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 24,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-8",
+              name: "30PT",
+              text: "30PT",
+              visibleInPsd: false,
+              group: ["右边", "右边分数"],
+              box: [925, 70, 989.52, 105.6],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 24,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+            {
+              id: "sp-bpl-text-9",
+              name: "duiyuan",
+              text: "duiyuan",
+              visibleInPsd: false,
+              group: ["右边", "右边队员名"],
+              box: [1100, 86.16, 1400, 145.44],
+              style: {
+                fontFamily:
+                  '"FZLanTingHei", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif',
+                fontSize: 32,
+                fontColor: "rgba(255, 255, 255, 1.0000)",
+                fontWeight: "400",
+                fontStyle: "normal",
+                textAlign: "left",
+                tracking: 0.0,
+                leading: 0.0,
+              },
+            },
+          ],
+        },
+      ];
+      const qs = new URLSearchParams(location.search);
+      if (qs.get("transparent") === "1")
+        document.documentElement.classList.add("transparent-mode");
+      const editor = document.getElementById("editor");
+      const presetSelect = document.getElementById("preset");
+      const canvas = document.getElementById("canvas");
+      const controls = document.getElementById("controls");
+      let current = qs.get("preset") || presets[0].id;
+      const state = {};
+      const sceneSnapshots = {};
+      const stagedSnapshots = {};
+      let activeScene = qs.get("scene") || null;
+
+      presets.forEach((p) => {
+        state[p.id] = {
+          texts: Object.fromEntries(
+            p.texts.map((t) => [
+              t.id,
+              { value: t.text, visible: true, fontSize: t.style.fontSize },
+            ]),
+          ),
+          hues: Object.fromEntries(p.images.map((i) => [i.id, 0])),
+        };
+      });
+
+      function esc(s) {
+        return String(s).replace(
+          /[&<>"']/g,
+          (c) =>
+            ({
+              "&": "&amp;",
+              "<": "&lt;",
+              ">": "&gt;",
+              '"': "&quot;",
+              "'": "&#39;",
+            })[c],
+        );
+      }
+
+      function fit() {
+        const s = Math.min(innerWidth / 1920, innerHeight / 1080);
+        canvas.style.transform = `scale(${s})`;
+      }
+
+      function render() {
+        const p = presets.find((x) => x.id === current) || presets[0];
+        const st = state[p.id];
+        canvas.innerHTML = "";
+        p.images.forEach((i) => {
+          const e = document.createElement("img");
+          e.className = "asset";
+          e.src = i.src;
+          e.alt = "";
+          e.dataset.id = i.id;
+          const [x, y, right, bottom] = i.box;
+          e.style.left = x + "px";
+          e.style.top = y + "px";
+          e.style.width = right - x + "px";
+          e.style.height = bottom - y + "px";
+          e.style.setProperty("--hue", (st.hues[i.id] || 0) + "deg");
+          canvas.appendChild(e);
+        });
+        p.texts.forEach((t) => {
+          const ts = st.texts[t.id];
+          const e = document.createElement("div");
+          e.className = "text";
+          e.contentEditable = "true";
+          e.dataset.id = t.id;
+          e.hidden = !ts.visible;
+          e.textContent = ts.value;
+          const [x, y, w, h] = t.box;
+          e.style.left = x + "px";
+          e.style.top = y + "px";
+          e.style.width = w - x + "px";
+          e.style.height = h - y + "px";
+          e.style.fontFamily = t.style.fontFamily;
+          e.style.fontSize = ts.fontSize + "px";
+          e.style.color = t.style.fontColor;
+          e.style.fontWeight = t.style.fontWeight;
+          e.style.fontStyle = t.style.fontStyle;
+          e.style.textAlign = t.style.textAlign;
+          e.style.justifyContent =
+            t.style.textAlign === "center"
+              ? "center"
+              : t.style.textAlign === "right"
+                ? "flex-end"
+                : "flex-start";
+          e.style.letterSpacing = t.style.tracking + "px";
+          e.addEventListener("input", () => {
+            ts.value = e.textContent;
+          });
+          canvas.appendChild(e);
+        });
+        renderControls(p);
+      }
+
+      function renderControls(p) {
+        controls.innerHTML = "";
+        const st = state[p.id];
+        const heading = document.createElement("div");
+        heading.className = "item";
+        heading.innerHTML = "<label>背景图层 Hue</label>";
+        controls.appendChild(heading);
+        p.images.forEach((i) => {
+          const d = document.createElement("div");
+          d.className = "item";
+          d.innerHTML = `<label>${esc(i.group.concat(i.name).join(" / "))}</label><input type="range" min="-180" max="180" value="${st.hues[i.id] || 0}">`;
+          d.querySelector("input").addEventListener("input", (ev) => {
+            st.hues[i.id] = ev.target.value;
+            const e = canvas.querySelector(`[data-id="${i.id}"]`);
+            e.style.setProperty("--hue", ev.target.value + "deg");
+          });
+          controls.appendChild(d);
+        });
+        const th = document.createElement("div");
+        th.className = "item";
+        th.innerHTML = "<label>文字内容、显示与字号</label>";
+        controls.appendChild(th);
+        p.texts.forEach((t) => {
+          const ts = st.texts[t.id];
+          const d = document.createElement("div");
+          d.className = "item";
+          d.innerHTML = `<div class="text-options"><label><input class="text-visible" type="checkbox" ${ts.visible ? "checked" : ""}>显示</label><input class="text-size" type="number" min="1" max="300" step="0.1" value="${ts.fontSize}" title="字号"></div><label>${esc(t.group.concat(t.name).join(" / "))}</label><input type="text" value="${esc(ts.value)}">`;
+          d.querySelector(".text-visible").addEventListener("change", (ev) => {
+            ts.visible = ev.target.checked;
+            const e = canvas.querySelector(`[data-id="${t.id}"]`);
+            e.hidden = !ts.visible;
+          });
+          d.querySelector(".text-size").addEventListener("input", (ev) => {
+            const size = Math.max(
+              1,
+              Math.min(300, Number(ev.target.value) || 1),
+            );
+            ts.fontSize = size;
+            ev.target.value = size;
+            const e = canvas.querySelector(`[data-id="${t.id}"]`);
+            e.style.fontSize = size + "px";
+          });
+          d.querySelector("input[type=text]").addEventListener(
+            "input",
+            (ev) => {
+              ts.value = ev.target.value;
+              const e = canvas.querySelector(`[data-id="${t.id}"]`);
+              e.textContent = ev.target.value;
+            },
+          );
+          controls.appendChild(d);
+        });
+      }
+
+      const TEXT_INDEX = {
+        header_brand: 0,
+        header_match_type: 1,
+        header_round: 2,
+        header_theme: 3,
+      };
+
+      function presetId(template) {
+        return String(template || "").replaceAll("_", "-");
+      }
+
+      function currentPreset() {
+        return presets.find((p) => p.id === current) || presets[0];
+      }
+
+      function setTextValue(p, index, value) {
+        const text = p.texts[index];
+        if (!text || value === undefined || value === null) return;
+        const st = state[p.id].texts[text.id];
+        st.value = String(value);
+        const element = canvas.querySelector(`[data-id="${text.id}"]`);
+        if (element) element.textContent = st.value;
+      }
+
+      function applyBusinessTexts(values) {
+        const p = currentPreset();
+        for (const [key, index] of Object.entries(TEXT_INDEX)) {
+          if (values[key] !== undefined) setTextValue(p, index, values[key]);
+        }
+        if (p.id.endsWith("-bpl")) {
+          const fields = [
+            ["left_team_name", 4], ["left_points", 5], ["left_player", 6],
+            ["right_team_name", 7], ["right_points", 8], ["right_player", 9],
+          ];
+          fields.forEach(([key, index]) => setTextValue(p, index, values[key]));
+        } else {
+          for (let machine = 1; machine <= 4; machine += 1) {
+            setTextValue(p, machine + 3, values[`machine_${machine}_player`]);
+          }
+        }
+      }
+
+      function applyHueValue(imageId, degrees) {
+        const value = Number(degrees);
+        if (!Number.isFinite(value)) return;
+        const st = state[currentPreset().id];
+        st.hues[imageId] = value;
+        const element = canvas.querySelector(`[data-id="${imageId}"]`);
+        if (element) element.style.setProperty("--hue", `${value}deg`);
+      }
+
+      function applyBusinessHues(hues) {
+        const p = currentPreset();
+        const applyGroup = (key, indexes) => {
+          if (hues[key] === undefined) return;
+          indexes.forEach((index) => {
+            if (p.images[index]) applyHueValue(p.images[index].id, hues[key]);
+          });
+        };
+        if (hues.all !== undefined) {
+          p.images.forEach((image) => applyHueValue(image.id, hues.all));
+        }
+        if (p.id.endsWith("-bpl")) {
+          applyGroup("left", [1, 2, 3]);
+          applyGroup("right", [4, 5, 6]);
+        } else {
+          for (let machine = 1; machine <= 4; machine += 1) {
+            applyGroup(`machine_${machine}`, [machine]);
+          }
+        }
+      }
+
+      function applyBusinessMessage(message) {
+        if (!message) return;
+        const data = message.data || message;
+        if (message.cmd === "stage") {
+          const snapshot = data.snapshot || {};
+          if (data.scene) stagedSnapshots[data.scene] = snapshot;
+          sendAck(message, true);
+          return;
+        }
+        if (message.cmd === "activate") {
+          const scene = data.scene;
+          const snapshot = scene && (stagedSnapshots[scene] || sceneSnapshots[scene]);
+          if (scene) activeScene = scene;
+          if (snapshot) {
+            sceneSnapshots[scene] = snapshot;
+            const next = presetId(snapshot.template);
+            if (next && presets.some((p) => p.id === next)) current = next;
+            render();
+            applyBusinessTexts(snapshot.texts || {});
+            applyBusinessHues(snapshot.hues || {});
+          }
+          sendAck(message, true);
+          return;
+        }
+        const next = presetId(data.template);
+        const targetScene = data.scene || activeScene;
+        if (targetScene) {
+          sceneSnapshots[targetScene] = {
+            template: data.template || current.replaceAll("-", "_"),
+            texts: data.texts || data.values || {},
+            hues: data.hues || data.values || {},
+          };
+        }
+        if (next && presets.some((p) => p.id === next) && next !== current && (!targetScene || targetScene === activeScene)) {
+          current = next;
+          render();
+        }
+        if ((message.cmd === "round_start" || message.cmd === "round_result") && (!targetScene || targetScene === activeScene)) {
+          applyBusinessTexts(data.texts || {});
+          applyBusinessHues(data.hues || {});
+        } else if (message.cmd === "set_text") {
+          applyBusinessTexts(data.values || data.texts || {});
+        } else if (message.cmd === "set_hue") {
+          applyBusinessHues(data.values || data.hues || { all: data.hue });
+        }
+      }
+
+      function sendAck(message, ok, error) {
+        const relay = window.overlayRelaySocket;
+        if (!relay || relay.readyState !== WebSocket.OPEN || !message || !message.request_id) return;
+        relay.send(JSON.stringify({
+          cmd: "ack",
+          request_id: message.request_id,
+          ok: !!ok,
+          error: error || null,
+        }));
+      }
+
+      function connectBusinessRelay() {
+        const host = location.hostname || "localhost";
+        const socket = new WebSocket(`ws://${host}:8082`);
+        window.overlayRelaySocket = socket;
+        socket.onmessage = (event) => {
+          try { applyBusinessMessage(JSON.parse(event.data)); }
+          catch (error) { console.error("Invalid overlay message", error); }
+        };
+        socket.onclose = () => setTimeout(connectBusinessRelay, 3000);
+      }
+
+      presets.forEach((p) => {
+        const o = document.createElement("option");
+        o.value = p.id;
+        o.textContent = p.label;
+        presetSelect.appendChild(o);
+      });
+      presetSelect.value = current;
+      presetSelect.addEventListener("change", () => {
+        current = presetSelect.value;
+        history.replaceState(
+          null,
+          "",
+          "?preset=" + current + (qs.get("edit") ? "&edit=1" : ""),
+        );
+        render();
+      });
+      if (qs.get("edit") === "1") editor.style.display = "block";
+      addEventListener("resize", fit);
+      fit();
+      render();
+      connectBusinessRelay();
+    </script>
+  </body>
+</html>

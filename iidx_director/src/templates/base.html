@@ -21,9 +21,14 @@
     <span class="badge badge-phase" id="badge-phase">-</span>
   </span>
 </nav>
+<section id="pending-bar" class="pending-bar hidden" aria-live="polite">
+  <span id="pending-label"></span>
+  <button type="button" id="pending-confirm">确认应用</button>
+  <button type="button" class="secondary" id="pending-cancel">取消</button>
+</section>
 <main>{% block content %}{% endblock %}</main>
 <div id="toast"></div>
-<script src="{{ url_for('static', filename='js/director.js') }}"></script>
+<script src="{{ url_for('static', filename='js/director.js', v='pending-2') }}"></script>
 {% block script %}{% endblock %}
 </body>
 </html>

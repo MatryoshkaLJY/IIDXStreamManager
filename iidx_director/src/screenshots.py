@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import re
 import uuid
 from pathlib import Path
 from urllib.parse import quote
 from typing import Any
+
+
+# Valid 1x1 transparent PNG used by the director test mode.
+EMPTY_SCREENSHOT_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+)
 
 
 class ScreenshotStore:

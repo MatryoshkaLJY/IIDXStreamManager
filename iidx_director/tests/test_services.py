@@ -12,7 +12,7 @@ def test_default_specs_use_repository_paths(tmp_path):
         "score-reco",
         "bpl-scoreboard",
         "knockout-scoreboard",
-        "sceneinfo",
+        "overlay-relay",
     ]
     assert [spec.port for spec in specs] == [9876, 9877, 8080, 8081, 8082]
 

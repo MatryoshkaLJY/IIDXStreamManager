@@ -8,8 +8,8 @@
 
 from __future__ import annotations
 
-import logging
 import io
+import logging
 import sys
 import threading
 import time
@@ -115,15 +115,11 @@ class CabinetMonitor:
                         logger.exception("on_update 回调异常")
                 scores = result.get("scores")
                 if scores and self.on_scores is not None:
-                    if self.on_score_frame is not None:
+                    score_frame = getattr(mgr, "last_score_frame", None)
+                    if self.on_score_frame is not None and score_frame is not None:
                         try:
-                            image = mgr.capture_source(
-                                self.machines[machine_id],
-                                target_size=(1920, 1080),
-                                image_format="png",
-                            )
                             buffer = io.BytesIO()
-                            image.save(buffer, format="PNG")
+                            score_frame.save(buffer, format="PNG")
                             self.on_score_frame(machine_id, buffer.getvalue())
                         except Exception:
                             logger.exception("机台 %s 成绩截图失败", machine_id)

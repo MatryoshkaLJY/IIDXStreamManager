@@ -59,12 +59,28 @@
   </div>
   <div class="hint">监控轮询 4 台机台画面，状态机触发抓分后自动带入当前回合。导播台启动时会自动准备识别服务。</div>
 </div>
+
+<div class="card">
+  <h2>开发测试模式</h2>
+  <div class="row">
+    <label><input type="checkbox" id="test-mode" onchange="toggleTestMode(this)"> 直接模拟机台出分</label>
+  </div>
+  <div class="hint">启用后无需采集卡或机台监控，可在比分确认页按机台输入 1P/2P 分数，并生成空白成绩截图。</div>
+</div>
 {% endblock %}
 {% block script %}
 <script>
 window.onSessionUpdate = function (snap) {
   document.querySelector(`input[name=mode][value=${snap.mode}]`).checked = true;
+  const testMode = document.getElementById('test-mode');
+  testMode.checked = !!snap.test_mode;
+  testMode.disabled = !!snap.session && snap.session.phase !== 'IDLE';
 };
+
+async function toggleTestMode(input) {
+  const resp = await postJSON('/api/test-mode', { enabled: input.checked });
+  if (!resp.success) input.checked = !input.checked;
+}
 
 async function obsConnect() {
   await postJSON('/api/obs/connect', {

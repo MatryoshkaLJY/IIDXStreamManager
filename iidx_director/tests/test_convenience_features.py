@@ -27,7 +27,7 @@ class Scoreboard:
         self.pushed.extend((item["board"], item["payload"]) for item in items)
 
 
-class SceneInfo:
+class Overlay:
     def push(self, payload):
         return True
 
@@ -57,7 +57,7 @@ def _setup(tmp_path, scene_events=None):
     if scene_events is not None:
         ctx.obs = OBS(scene_events)
     ctx.scoreboard = Scoreboard()
-    ctx.sceneinfo = SceneInfo()
+    ctx.overlay = Overlay()
     assert _post(client, "/api/config/upload", {"kind": "team", "content": json.dumps(TEAM_CONFIG)})["success"]
     assert _post(client, "/api/mode", {"mode": "team"})["success"]
     assert _post(client, "/api/match/start")["success"]
@@ -121,3 +121,30 @@ def test_scene_switch_api_and_screenshot_url(tmp_path):
     image = client.get(state["screenshots"]["IIDX#1"])
     assert image.status_code == 200
     assert image.data == b"png-data"
+
+
+def test_scene_switch_uses_actual_obs_scene_name(tmp_path):
+    client, ctx = _setup(tmp_path)
+    events = []
+    ctx.obs = OBS(events)
+
+    response = _post(client, "/api/obs/switch", {"scene": "team_sp_1v1"})
+
+    assert response["success"]
+    assert response["scene"] == "SP_BPL"
+    assert events == [("switch", "SP_BPL")]
+
+
+def test_test_mode_keeps_obs_scene_switching(tmp_path):
+    client, ctx = _setup(tmp_path)
+    events = []
+    ctx.obs = OBS(events)
+
+    assert _post(client, "/api/match/abort")["success"]
+    assert _post(client, "/api/test-mode", {"enabled": True})["success"]
+    response = _post(client, "/api/obs/switch", {"scene": "team_sp_2v2"})
+
+    assert response["success"]
+    assert response["scene"] == "SP_Arena"
+    assert events == [("switch", "SP_Arena")]
+    assert _post(client, "/api/test-mode", {"enabled": False})["success"]

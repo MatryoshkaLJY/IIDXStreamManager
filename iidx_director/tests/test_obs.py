@@ -49,6 +49,8 @@ class FakeOBSManager:
 
     def __init__(self, host, port, password):
         self.results = {}
+        self.last_score_frame = None
+        self.capture_calls = 0
         self.registered = []
         FakeOBSManager.instances.append(self)
 
@@ -63,10 +65,13 @@ class FakeOBSManager:
         self.registered.append((machine_id, source_name))
 
     def capture_source(self, source_name, target_size=None, image_format="png"):
+        self.capture_calls += 1
         return Image.new("RGB", target_size or (10, 10), "red")
 
     def process_frame(self, machine_id):
-        return self.results.get(machine_id, {"machine_id": machine_id, "scores": None})
+        result = self.results.get(machine_id, {"machine_id": machine_id, "scores": None})
+        self.last_score_frame = Image.new("RGB", (10, 10), "red") if result.get("scores") else None
+        return result
 
 
 def test_monitor_dispatches_scores_and_updates(monkeypatch):
@@ -118,6 +123,7 @@ def test_monitor_dispatches_score_frame(monkeypatch):
             time.sleep(0.02)
         assert frames and frames[0][0] == "IIDX#1"
         assert frames[0][1].startswith(b"\x89PNG")
+        assert not getattr(mgr, "capture_calls", 0)
     finally:
         mon.stop()
 

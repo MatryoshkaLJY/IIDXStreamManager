@@ -23,11 +23,35 @@
     const phase = snap.session ? snap.session.phase : 'IDLE';
     setBadge('badge-phase', PHASE_LABELS[phase] || phase, phase !== 'IDLE');
     renderSceneActions(snap);
+    renderPending(snap.pending);
+  }
+
+  function renderPending(pending) {
+    const bar = document.getElementById('pending-bar');
+    if (!bar) return;
+    bar.classList.toggle('hidden', !pending);
+    if (!pending) return;
+    document.getElementById('pending-label').textContent =
+      `待应用：${pending.scene} / ${pending.template}（${pending.status}）` +
+      (pending.error ? `：${pending.error}` : '');
+    const confirmButton = document.getElementById('pending-confirm');
+    confirmButton.textContent = pending.status === 'failed' ? '重试应用' : '确认应用';
+    confirmButton.onclick = async () => {
+      const result = await window.postJSON('/api/scene/pending/confirm', { id: pending.id });
+      if (result.success) window.toast('待应用操作已完成');
+    };
+    document.getElementById('pending-cancel').onclick = async () => {
+      const result = await window.postJSON('/api/scene/pending/cancel', { id: pending.id });
+      if (result.success) window.toast('已取消待应用操作');
+    };
   }
 
   const SCENE_LABELS = {
-    live: '现场', team_sp: 'SP 团队', team_dp: 'DP 团队',
-    individual: '个人赛', scoreboard: '计分板',
+    live: '现场',
+    team_sp_1v1: 'SP 团队 1V1', team_sp_2v2: 'SP 团队 2V2',
+    team_dp_1v1: 'DP 团队 1V1', team_dp_2v2: 'DP 团队 2V2',
+    individual_sp: 'SP 个人赛', individual_dp: 'DP 个人赛',
+    scoreboard: '计分板',
   };
 
   function renderSceneActions(snap) {
@@ -53,7 +77,7 @@
     if (button) button.disabled = true;
     try {
       const resp = await window.postJSON('/api/obs/switch', { scene });
-      if (resp.success) window.toast(`已切换到${button ? button.textContent : '目标场景'}`);
+      if (resp.success) window.toast(`已创建待应用场景：${button ? button.textContent : '目标场景'}`);
     } finally {
       if (button) button.disabled = !window.lastSnapshot || !window.lastSnapshot.obs_connected;
     }
