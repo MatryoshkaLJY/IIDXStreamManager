@@ -102,6 +102,19 @@ class AppContext:
             warnings.append(f"切换场景 {scene} 失败: {exc}")
             return False
 
+    def apply_match_visibility(self, scene: str, session: MatchSession) -> None:
+        if not self.obs_connected():
+            raise RuntimeError("OBS 未连接")
+        team_by_player: dict[str, str] = {}
+        if session.mode == "team":
+            info = session.current_round_info()
+            team_by_player.update({player: "L" for player in info.get("left_players", [])})
+            team_by_player.update({player: "R" for player in info.get("right_players", [])})
+        apply_visibility = getattr(self.obs, "apply_match_visibility", None)
+        if apply_visibility is None:
+            return
+        apply_visibility(scene, session.play_type, session.assignments, team_by_player)
+
     def switch_scoreboard_and_push(self, payloads, warnings: list[str]) -> None:
         switched = self.try_switch_scene(self.state.scenes.get("scoreboard"), warnings)
         if switched:
@@ -227,6 +240,9 @@ def create_app(config_dir: Path | None = None):
             if action == "round_begin" and not pending.action_data.get("done"):
                 stage = "action"
                 session = _require_session()
+                if not pending.action_data.get("visibility_done"):
+                    ctx.apply_match_visibility(pending.scene, session)
+                    pending.action_data["visibility_done"] = True
                 if not pending.action_data.get("session_started"):
                     session.begin_round()
                     pending.action_data["session_started"] = True

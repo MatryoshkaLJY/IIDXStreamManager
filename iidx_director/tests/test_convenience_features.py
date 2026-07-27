@@ -42,6 +42,17 @@ class OBS:
         self.events.append(("switch", scene))
 
 
+class VisibilityOBS(OBS):
+    def __init__(self, events, fail=False):
+        super().__init__(events)
+        self.fail = fail
+
+    def apply_match_visibility(self, scene, play_type, assignments, team_by_player):
+        self.events.append(("visibility", scene, play_type, assignments, team_by_player))
+        if self.fail:
+            raise RuntimeError("模拟可见性失败")
+
+
 def _post(client, path, payload=None):
     response = client.post(path, json=payload or {})
     assert response.status_code == 200
@@ -148,3 +159,41 @@ def test_test_mode_keeps_obs_scene_switching(tmp_path):
     assert response["scene"] == "SP_Arena"
     assert events == [("switch", "SP_Arena")]
     assert _post(client, "/api/test-mode", {"enabled": False})["success"]
+
+
+def test_round_begin_confirm_applies_match_visibility(tmp_path):
+    events = []
+    client, ctx = _setup(tmp_path)
+    ctx.obs = VisibilityOBS(events)
+
+    response = _post(client, "/api/scene/pending/confirm", {
+        "id": ctx.scenes.pending.id,
+    })
+
+    assert response["success"]
+    assert events[0] == ("switch", "SP_BPL")
+    assert events[1][0:3] == ("visibility", "SP_BPL", "SP")
+    assert ctx.session.phase.value == "LIVE"
+
+
+def test_visibility_failure_keeps_pending_for_retry(tmp_path):
+    events = []
+    client, ctx = _setup(tmp_path)
+    ctx.obs = VisibilityOBS(events, fail=True)
+
+    response = _post(client, "/api/scene/pending/confirm", {
+        "id": ctx.scenes.pending.id,
+    })
+
+    assert not response["success"]
+    assert ctx.session.phase.value == "PREP"
+    assert ctx.scenes.pending is not None
+    assert ctx.scenes.pending.status == "failed"
+    assert ctx.scenes.pending.failed_stage == "action"
+
+    ctx.obs = VisibilityOBS(events)
+    retry = _post(client, "/api/scene/pending/confirm", {
+        "id": ctx.scenes.pending.id,
+    })
+    assert retry["success"]
+    assert ctx.session.phase.value == "LIVE"

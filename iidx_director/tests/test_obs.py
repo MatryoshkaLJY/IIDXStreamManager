@@ -42,6 +42,107 @@ def test_client_require_connection():
         OBSClient().switch_scene("x")
 
 
+def test_client_applies_sp_arena_visibility():
+    client, req = _make_client()
+
+    def send(request, data=None, raw=False):
+        if request == "GetSceneItemList":
+            groups = [
+                f"SP_C{machine}_{side}"
+                for machine in range(1, 5)
+                for side in ("1P", "2P")
+            ] + [
+                f"SP_MIDUI_{side}" for side in ("1P", "2P")
+            ] + [
+                f"SP_{side}_{suffix}"
+                for side in ("1P", "2P")
+                for suffix in ("SongName", "BPM")
+            ]
+            return {"sceneItems": [
+                {"sourceName": name, "sceneItemId": index}
+                for index, name in enumerate(groups, start=1)
+            ]}
+        if request == "GetGroupSceneItemList":
+            return {
+                "sceneItems": [
+                    {"sourceName": f"IIDX#{i}", "sceneItemId": i} for i in range(1, 5)
+                ]
+            }
+        return {}
+
+    req.return_value.send.side_effect = send
+    client.apply_match_visibility(
+        "SP_Arena", "SP", {"p": {"machine": "IIDX#2", "side": "1p"}}
+    )
+
+    enabled = [
+        call.args[1]
+        for call in req.return_value.send.call_args_list
+        if call.args[0] == "SetSceneItemEnabled" and call.args[1]["sceneItemEnabled"]
+    ]
+    assert any(item["sceneName"] == "SP_Arena" for item in enabled)
+    assert any(item["sceneName"] == "SP_MIDUI_1P" and item["sceneItemId"] == 1 for item in enabled)
+    assert not any(item["sceneName"] == "SP_MIDUI_2P" and item["sceneItemEnabled"] for item in enabled)
+
+
+def test_client_dp_bpl_public_groups_show_both_machines():
+    client, req = _make_client()
+
+    def send(request, data=None, raw=False):
+        if request == "GetSceneItemList":
+            groups = ["DP_LJUDGE", "DP_LUI", "DP_RJUDGE", "DP_RUI", "DP_LCAM", "DP_RCAM"]
+            groups += ["Gauges", "DP_SongName", "DP_BPM"]
+            return {"sceneItems": [
+                {"sourceName": name, "sceneItemId": index}
+                for index, name in enumerate(groups, start=1)
+            ]}
+        if request == "GetGroupSceneItemList":
+            return {
+                "sceneItems": [
+                    {"sourceName": f"IIDX#{i}", "sceneItemId": i} for i in range(1, 5)
+                ] + [{"sourceName": f"CAM#{i}", "sceneItemId": i + 10} for i in range(1, 5)]
+            }
+        return {}
+
+    req.return_value.send.side_effect = send
+    client.apply_match_visibility(
+        "DP_BPL", "DP",
+        {
+            "left": {"machine": "IIDX#1", "side": "1p"},
+            "right": {"machine": "IIDX#3", "side": "2p"},
+        },
+        {"left": "L", "right": "R"},
+    )
+
+    public_enabled = []
+    for call in req.return_value.send.call_args_list:
+        if call.args[0] == "SetSceneItemEnabled":
+            data = call.args[1]
+            if data["sceneName"] == "Gauges" and data["sceneItemEnabled"]:
+                public_enabled.append(data["sceneItemId"])
+    assert sorted(public_enabled) == [1, 3]
+
+
+def test_client_visibility_requires_target_element():
+    client, req = _make_client()
+
+    def send(request, data=None, raw=False):
+        if request == "GetSceneItemList":
+            return {"sceneItems": [
+                {"sourceName": name, "sceneItemId": index}
+                for index, name in enumerate(("Gauges", "DP_SongName", "DP_BPM"), start=1)
+            ]}
+        if request == "GetGroupSceneItemList":
+            return {"sceneItems": []}
+        return {}
+
+    req.return_value.send.side_effect = send
+    with pytest.raises(RuntimeError, match="缺少元素"):
+        client.apply_match_visibility(
+            "DP_Arena", "DP", {"p": {"machine": "IIDX#1", "side": "1p"}}
+        )
+
+
 # ---- CabinetMonitor ----
 
 class FakeOBSManager:
