@@ -59,6 +59,18 @@ def _post(client, path, payload=None):
     return response.get_json()
 
 
+def _confirm_pending(client, ctx):
+    pending = ctx.scenes.pending
+    assert pending is not None
+    response = _post(client, "/api/scene/pending/confirm", {"id": pending.id})
+    assert response["success"], response
+    return response
+
+
+def _capture_scores(ctx):
+    ctx.session.on_machine_scores("IIDX#1", {"1pscore": "2000", "2pscore": "1500"})
+
+
 def _setup(tmp_path, scene_events=None):
     app, _ = create_app(config_dir=tmp_path / "config")
     app.config["TESTING"] = True
@@ -95,10 +107,14 @@ def test_confirm_switches_waits_then_pushes(tmp_path):
     ctx.obs = OBS(events)
     ctx.scoreboard = Scoreboard(events)
     ctx.sleep = lambda seconds: events.append(("sleep", seconds))
+    _confirm_pending(client, ctx)
+    events.clear()
+    _capture_scores(ctx)
 
     response = _post(client, "/api/round/confirm", {"scores": {"L1": 2000, "R1": 1500}})
 
     assert response["success"]
+    _confirm_pending(client, ctx)
     assert events == [("switch", ctx.state.scenes["scoreboard"]), ("sleep", 5.0), "push"]
 
 
@@ -108,7 +124,11 @@ def test_advance_does_not_switch_scene(tmp_path):
     ctx.obs = OBS(events)
     ctx.scoreboard = Scoreboard()
     ctx.sleep = lambda seconds: None
+    _confirm_pending(client, ctx)
+    events.clear()
+    _capture_scores(ctx)
     assert _post(client, "/api/round/confirm", {"scores": {"L1": 2000, "R1": 1500}})["success"]
+    _confirm_pending(client, ctx)
     events.clear()
 
     response = _post(client, "/api/round/advance")
@@ -121,12 +141,14 @@ def test_scene_switch_api_and_screenshot_url(tmp_path):
     client, ctx = _setup(tmp_path)
     events = []
     ctx.obs = OBS(events)
+    _post(client, "/api/scene/pending/cancel", {"id": ctx.scenes.pending.id})
     ctx.screenshots.save("round-1", "IIDX#1", b"png-data")
 
     response = _post(client, "/api/obs/switch", {"scene": "scoreboard"})
+    assert response["success"]
+    _confirm_pending(client, ctx)
     state = client.get("/api/state").get_json()
 
-    assert response["success"]
     assert events == [("switch", ctx.state.scenes["scoreboard"])]
     assert "IIDX#1" in state["screenshots"]
     image = client.get(state["screenshots"]["IIDX#1"])
@@ -138,10 +160,12 @@ def test_scene_switch_uses_actual_obs_scene_name(tmp_path):
     client, ctx = _setup(tmp_path)
     events = []
     ctx.obs = OBS(events)
+    _post(client, "/api/scene/pending/cancel", {"id": ctx.scenes.pending.id})
 
     response = _post(client, "/api/obs/switch", {"scene": "team_sp_1v1"})
-
     assert response["success"]
+    _confirm_pending(client, ctx)
+
     assert response["scene"] == "SP_BPL"
     assert events == [("switch", "SP_BPL")]
 
@@ -154,8 +178,9 @@ def test_test_mode_keeps_obs_scene_switching(tmp_path):
     assert _post(client, "/api/match/abort")["success"]
     assert _post(client, "/api/test-mode", {"enabled": True})["success"]
     response = _post(client, "/api/obs/switch", {"scene": "team_sp_2v2"})
-
     assert response["success"]
+    _confirm_pending(client, ctx)
+
     assert response["scene"] == "SP_Arena"
     assert events == [("switch", "SP_Arena")]
     assert _post(client, "/api/test-mode", {"enabled": False})["success"]

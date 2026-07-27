@@ -46,6 +46,16 @@ class FakeOverlayPusher:
         return True
 
 
+class FakeOBS:
+    connected = True
+
+    def switch_scene(self, name):
+        pass
+
+    def apply_match_visibility(self, scene, play_type, assignments, team_by_player):
+        pass
+
+
 @pytest.fixture
 def env(tmp_path):
     app, socketio = create_app(config_dir=tmp_path)
@@ -53,6 +63,7 @@ def env(tmp_path):
     ctx = app.config["CONTEXT"]
     ctx.scoreboard = FakeScoreboardPusher()
     ctx.overlay = FakeOverlayPusher()
+    ctx.obs = FakeOBS()
     client = app.test_client()
     return app, client, ctx
 
@@ -81,6 +92,14 @@ def _feed_scores(ctx, machine_ex):
     for machine, sides in machine_ex.items():
         scores = {f"{side}score": str(ex) for side, ex in sides.items()}
         ctx.session.on_machine_scores(machine, scores)
+
+
+def _confirm_pending(client, ctx):
+    pending = ctx.scenes.pending
+    assert pending is not None
+    response = _post(client, "/api/scene/pending/confirm", {"id": pending.id})
+    assert response["success"], response
+    return response
 
 
 def test_default_scene_uses_schedule_play_type_and_round_type():
@@ -163,7 +182,8 @@ def test_team_match_full_api_flow(env):
     assert resp["success"]
     resp = _post(client, "/api/round/begin", {"scene": "SP团队赛"})
     assert resp["success"]
-    assert resp["warnings"] == []
+    confirm = _confirm_pending(client, ctx)
+    assert confirm["warnings"] == []
     # overlay round_start 已推送
     assert ctx.overlay.pushed[-1]["cmd"] == "round_start"
     assert ctx.overlay.pushed[-1]["data"]["template"] == "sp_bpl"
@@ -173,6 +193,7 @@ def test_team_match_full_api_flow(env):
 
     resp = _post(client, "/api/round/confirm", {"scores": {"L1": 2000, "R1": 1500}})
     assert resp["success"]
+    _confirm_pending(client, ctx)
     board, payload = ctx.scoreboard.pushed[-1]
     assert payload == {"cmd": "score", "data": {"round": 1, "leftScore": 1, "rightScore": 0}}
     assert ctx.overlay.pushed[-1]["cmd"] == "round_result"
@@ -188,9 +209,11 @@ def test_team_match_full_api_flow(env):
         }
     })
     _post(client, "/api/round/begin", {})
+    _confirm_pending(client, ctx)
     _feed_scores(ctx, {"IIDX#2": {"1p": 1000, "2p": 3000}})
     resp = _post(client, "/api/round/confirm", {"scores": {"L2": 1000, "R2": 3000}})
     assert resp["success"]
+    _confirm_pending(client, ctx)
     assert ctx.scoreboard.pushed[-1][1]["data"] == {"round": 2, "leftScore": 0, "rightScore": 2}
     resp = _post(client, "/api/round/advance")
     assert resp["match_end"]
@@ -206,12 +229,18 @@ def test_confirm_push_failure_and_repush(env):
         }
     })
     _post(client, "/api/round/begin", {})
+    _confirm_pending(client, ctx)
     _feed_scores(ctx, {"IIDX#1": {"1p": 2000, "2p": 1500}})
     ctx.scoreboard.fail_next = True
     resp = _post(client, "/api/round/confirm", {"scores": {"L1": 2000, "R1": 1500}})
-    assert not resp["success"] and resp["repush"]
+    assert resp["success"]
+    pending = ctx.scenes.pending
+    assert pending is not None
+    resp = _post(client, "/api/scene/pending/confirm", {"id": pending.id})
+    assert not resp["success"] and resp["pending"]
     resp = _post(client, "/api/round/repush")
     assert resp["success"]
+    _confirm_pending(client, ctx)
     assert ctx.scoreboard.pushed[-1][1]["cmd"] == "score"
 
 
@@ -225,9 +254,11 @@ def test_confirm_edited_scores(env):
         }
     })
     _post(client, "/api/round/begin", {})
+    _confirm_pending(client, ctx)
     _feed_scores(ctx, {"IIDX#1": {"1p": 2000, "2p": 1500}})
     resp = _post(client, "/api/round/confirm", {"scores": {"L1": 100, "R1": 9000}})
     assert resp["success"]
+    _confirm_pending(client, ctx)
     assert ctx.scoreboard.pushed[-1][1]["data"] == {"round": 1, "leftScore": 0, "rightScore": 1}
 
 
@@ -251,6 +282,7 @@ def test_force_review_manual_entry(env):
         }
     })
     _post(client, "/api/round/begin", {})
+    _confirm_pending(client, ctx)
     # 抓分不可用，手动录入
     resp = _post(client, "/api/round/force_review", {"scores": {"L1": 2100, "R1": 1500}})
     assert resp["success"]
@@ -258,6 +290,7 @@ def test_force_review_manual_entry(env):
     assert ctx.session.last_result["winner"] == "left"
     resp = _post(client, "/api/round/confirm", {"scores": {"L1": 2100, "R1": 1500}})
     assert resp["success"]
+    _confirm_pending(client, ctx)
     assert ctx.scoreboard.pushed[-1][1]["data"] == {"round": 1, "leftScore": 1, "rightScore": 0}
 
 
@@ -275,6 +308,7 @@ def test_test_mode_injects_machine_scores_and_blank_screenshot(env, tmp_path):
         }
     })
     _post(client, "/api/round/begin", {})
+    _confirm_pending(client, ctx)
 
     response = _post(client, "/api/test/scores", {
         "machine_id": "IIDX#1",
