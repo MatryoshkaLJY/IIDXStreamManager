@@ -1,0 +1,18 @@
+{
+  "playType": "DP",
+  "tournamentName": "8人淘汰赛",
+  "groups": {
+    "E": [
+      "HL",
+      "T",
+      "D3",
+      "CN.LYY"
+    ],
+    "F": [
+      "SIII",
+      "P3",
+      "C.M.Y.K",
+      "M-FLIP"
+    ]
+  }
+}

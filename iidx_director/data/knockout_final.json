@@ -1,0 +1,12 @@
+{
+  "playType": "SP",
+  "tournamentName": "淘汰赛决赛",
+  "groups": {
+    "finals": [
+      "AAtoZZ",
+      "29",
+      "MM",
+      "ANSHI"
+    ]
+  }
+}

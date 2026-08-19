@@ -1,0 +1,188 @@
+{
+  "playType": "DP",
+  "stageName": "セミファイナルステージ",
+  "matchNumber": 2,
+  "leftTeam": {
+    "name": "中二 CLUB",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#F2370F",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "Ern1st",
+      "Hrism",
+      "6",
+      "HU",
+      "PAINAPO",
+      "JUNGLE",
+      "CN.Lyy",
+      "D3"
+    ]
+  },
+  "rightTeam": {
+    "name": "中5 CLUB",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1B6EE3",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "SETU",
+      "TENNIS",
+      "NEPT",
+      "ALEXX",
+      "HL",
+      "7sref",
+      "CLOUD",
+      "SIII"
+    ]
+  },
+  "grabRounds": 0,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+    
+          "leftPlayers": ["Ern1st"],
+          "rightPlayers": ["SETU"]
+        },
+        {
+    
+          "leftPlayers": ["Ern1st"],
+          "rightPlayers": ["SETU"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK",
+      "games": [
+        {
+    
+          "leftPlayers": ["Hrism"],
+          "rightPlayers": ["TENNIS"]
+        },
+        {
+    
+          "leftPlayers": ["Hrism"],
+          "rightPlayers": ["TENNIS"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SOF-LAN",
+      "games": [
+        {
+    
+          "leftPlayers": ["6"],
+          "rightPlayers": ["NEPT"]
+        },
+        {
+    
+          "leftPlayers": ["6"],
+          "rightPlayers": ["NEPT"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+    
+          "leftPlayers": ["HU"],
+          "rightPlayers": ["ALEXX"]
+        },
+        {
+    
+          "leftPlayers": ["HU"],
+          "rightPlayers": ["ALEXX"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD",
+      "games": [
+        {
+    
+          "leftPlayers": ["PAINAPO"],
+          "rightPlayers": ["HL"]
+        },
+        {
+    
+          "leftPlayers": ["PAINAPO"],
+          "rightPlayers": ["HL"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+    
+          "leftPlayers": ["JUNGLE"],
+          "rightPlayers": ["7sref"]
+        },
+        {
+    
+          "leftPlayers": ["JUNGLE"],
+          "rightPlayers": ["7sref"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+    
+          "leftPlayers": ["CN.Lyy"],
+          "rightPlayers": ["CLOUD"]
+        },
+        {
+    
+          "leftPlayers": ["CN.Lyy"],
+          "rightPlayers": ["CLOUD"]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+    
+          "leftPlayers": ["D3"],
+          "rightPlayers": ["SIII"]
+        },
+        {
+    
+          "leftPlayers": ["D3"],
+          "rightPlayers": ["SIII"]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    }
+  ]
+}

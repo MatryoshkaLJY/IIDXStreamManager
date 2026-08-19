@@ -4,9 +4,12 @@ nav { display: flex; align-items: center; gap: 4px; background: #1d1f26; padding
 nav .brand { font-weight: bold; margin-right: 16px; color: #ffca28; }
 nav a { color: #aab; text-decoration: none; padding: 6px 12px; border-radius: 6px; }
 nav a.active, nav a:hover { background: #2c2f3a; color: #fff; }
-nav .scene-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+nav .scene-actions, nav .audio-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 nav .scene-button { padding: 6px 9px; font-size: 12px; background: #3a3d4a; }
 nav .scene-button:hover { background: #4a4d5a; }
+nav .audio-actions { margin-left: 6px; padding-left: 10px; border-left: 1px solid #2c2f3a; }
+nav .audio-button { background: #3d4a3a; }
+nav .audio-button:hover { background: #4a5a47; }
 nav .badges { margin-left: auto; display: flex; gap: 6px; }
 .pending-bar { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: #3a2f1d; color: #ffca28; font-size: 13px; }
 .pending-bar button { padding: 5px 12px; font-size: 12px; }

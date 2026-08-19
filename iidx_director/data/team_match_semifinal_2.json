@@ -1,0 +1,248 @@
+{
+  "playType": "SP",
+  "stageName": "セミファイナルステージ",
+  "matchNumber": 2,
+  "leftTeam": {
+    "name": "地力系女选手",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#F2370F",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "CATHY",
+      "7-DOWN",
+      "SUIKA",
+      "ZHOUPU",
+      "MIMOE",
+      "HAKO",
+      "BACH",
+      "AOKI.S",
+      "CHIHAYA",
+      "KYOSAK",
+      "RETUNE",
+      "OGUR1."
+    ]
+  },
+  "rightTeam": {
+    "name": "二游",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1B6EE3",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "Hrism",
+      "Kodak",
+      "THAC",
+      "SASAKA",
+      "nin",
+      "MKRtypB",
+      "TENNIS",
+      "FISHY",
+      "SETU",
+      "DDZ",
+      "DENJIN",
+      "MM"
+    ]
+  },
+  "grabRounds": 4,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "LEVEL 8",
+      "games": [
+        {
+  
+          "leftPlayers": ["CATHY"],
+          "rightPlayers": ["Hrism"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 9",
+      "games": [
+        {
+  
+          "leftPlayers": ["7-DOWN"],
+          "rightPlayers": ["Kodak"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 10",
+      "games": [
+        {
+  
+          "leftPlayers": ["SUIKA"],
+          "rightPlayers": ["THAC"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 11",
+      "games": [
+        {
+  
+          "leftPlayers": ["ZHOUPU"],
+          "rightPlayers": ["SASAKA"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+  
+          "leftPlayers": ["MIMOE"],
+          "rightPlayers": ["nin"]
+        },
+        {
+  
+          "leftPlayers": ["MIMOE"],
+          "rightPlayers": ["nin"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SOF-LAN",
+      "games": [
+        {
+  
+          "leftPlayers": ["HAKO"],
+          "rightPlayers": ["MKRtypB"]
+        },
+        {
+  
+          "leftPlayers": ["HAKO"],
+          "rightPlayers": ["MKRtypB"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK",
+      "games": [
+        {
+  
+          "leftPlayers": ["BACH"],
+          "rightPlayers": ["TENNIS"]
+        },
+        {
+  
+          "leftPlayers": ["BACH"],
+          "rightPlayers": ["TENNIS"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+  
+          "leftPlayers": ["AOKI.S"],
+          "rightPlayers": ["FISHY"]
+        },
+        {
+  
+          "leftPlayers": ["AOKI.S"],
+          "rightPlayers": ["FISHY"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+  
+          "leftPlayers": ["CHIHAYA"],
+          "rightPlayers": ["SETU"]
+        },
+        {
+  
+          "leftPlayers": ["CHIHAYA"],
+          "rightPlayers": ["SETU"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD",
+      "games": [
+        {
+  
+          "leftPlayers": ["KYOSAK"],
+          "rightPlayers": ["DDZ"]
+        },
+        {
+  
+          "leftPlayers": ["KYOSAK"],
+          "rightPlayers": ["DDZ"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+  
+          "leftPlayers": ["RETUNE"],
+          "rightPlayers": ["DENJIN"]
+        },
+        {
+  
+          "leftPlayers": ["RETUNE"],
+          "rightPlayers": ["DENJIN"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+  
+          "leftPlayers": ["OGUR1."],
+          "rightPlayers": ["MM"]
+        },
+        {
+  
+          "leftPlayers": ["OGUR1."],
+          "rightPlayers": ["MM"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "ex"
+    }
+  ]
+}

@@ -14,6 +14,7 @@
   <a href="/prep" data-nav="prep">回合准备</a>
   <a href="/review" data-nav="review">比分确认</a>
   <div class="scene-actions" id="scene-actions" aria-label="OBS 场景快捷切换"></div>
+  <div class="audio-actions" id="audio-actions" aria-label="音频源快捷切换"></div>
   <span class="badges">
     <span class="badge" id="badge-obs">OBS ✗</span>
     <span class="badge" id="badge-monitor">监控 ✗</span>
@@ -28,7 +29,7 @@
 </section>
 <main>{% block content %}{% endblock %}</main>
 <div id="toast"></div>
-<script src="{{ url_for('static', filename='js/director.js', v='pending-2') }}"></script>
+<script src="{{ url_for('static', filename='js/director.js', v='audio-1') }}"></script>
 {% block script %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,30 @@
+{
+  "playType": "DP",
+  "tournamentName": "DP个人赛",
+  "groups": {
+    "A": [
+      "HL",
+      "SIII",
+      "RUN",
+      "NEGI"
+    ],
+    "D": [
+      "P3",
+      "T",
+      "S9ryne",
+      "TENNIS"
+    ],
+    "C": [
+      "C.M.Y.K",
+      "MM",
+      "JUNGLE",
+      "D3"
+    ],
+    "B": [
+      "CN.Lyy",
+      "M/-FLIP",
+      "YT42",
+      "HU。"
+    ]
+  }
+}

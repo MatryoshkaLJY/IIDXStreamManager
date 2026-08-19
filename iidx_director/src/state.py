@@ -22,6 +22,7 @@ DEFAULT_SCENES = {
     "team_dp_2v2": "DP_Arena",
     "individual_sp": "SP_Arena",
     "individual_dp": "DP_Arena",
+    "grid": "Grid",
     "scoreboard": "Scoreboard_web",
 }
 
@@ -32,11 +33,19 @@ DEFAULT_MACHINES = {f"IIDX#{i}": f"IIDX#{i}" for i in range(1, 5)}
 class RuntimeState:
     obs_host: str = "localhost"
     obs_port: int = 4455
-    mode: str = "team"  # team | knockout
+    mode: str = "team"  # team | knockout | knockout_ef | knockout_final
     test_mode: bool = False
     scenes: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_SCENES))
     machines: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_MACHINES))
     monitor_interval: float = 1.0
+    serial_audio: dict[str, Any] = field(
+        default_factory=lambda: {
+            "enabled": False,
+            "port": None,
+            "baudrate": 9600,
+            "timeout": 1.0,
+        }
+    )
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

@@ -10,15 +10,18 @@
   <div class="card">
     <h2 id="live-title">比赛进行中</h2>
     <div class="cabinet-grid" id="cabinet-grid"></div>
+    <div class="row" style="margin-top:14px">
+      <button class="big" id="capture-btn" onclick="captureScores(this)">📸 抓取所有机台分数</button>
+    </div>
     <div id="test-score-panel" class="test-score-panel hidden">
       <h3>测试模式：模拟机台出分</h3>
       <div id="test-score-forms"></div>
     </div>
-    <div class="hint">状态机触发抓分后自动进入确认环节。若长时间无反应，请检查机台画面与识别服务。</div>
+    <div class="hint">选手成绩画面停留时点击按钮，并行抓取所有游玩机台；抓分后进入确认环节，未识别到的成绩可对照截图补录。</div>
     <div style="margin-top:14px">
       <button class="secondary" onclick="toggleManual()">抓分失败？手动录入</button>
       <div id="manual-entry" class="hidden" style="margin-top:10px">
-        <table><tr><th>选手</th><th>EX 分</th></tr><tbody id="manual-rows"></tbody></table>
+        <table><tr><th>选手</th><th id="manual-score-header">EX 分</th></tr><tbody id="manual-rows"></tbody></table>
         <div class="row" style="margin-top:10px">
           <button onclick="submitManual()">进入比分确认</button>
         </div>
@@ -32,11 +35,12 @@
     <h2>确认比分（可修改）</h2>
     <div class="score-screenshots" id="score-screenshots"></div>
     <table>
-      <tr><th>选手</th><th>机台</th><th>侧</th><th>EX 分</th></tr>
+      <tr><th>选手</th><th>机台</th><th>侧</th><th id="review-score-header">EX 分</th></tr>
       <tbody id="score-rows"></tbody>
     </table>
     <div class="verdict" id="verdict"></div>
     <div class="row">
+      <button class="secondary" id="recapture-btn" onclick="captureScores(this)">🔄 重新抓分</button>
       <button class="big" id="confirm-score-btn" onclick="confirmScores()">✓ 创建计分板待应用</button>
     </div>
   </div>
@@ -78,6 +82,7 @@ window.onSessionUpdate = function (snap) {
   } else if (phase === 'LIVE') {
     document.getElementById('live-area').classList.remove('hidden');
     manualPlayers = session.round ? session.round.players : [];
+    currentJudgeBy = (session.round && session.round.judge_by) || 'ex';
     renderLiveTitle(session.round);
     renderCabinets(snap);
     renderTestScorePanel(session, snap);
@@ -86,10 +91,15 @@ window.onSessionUpdate = function (snap) {
     renderReview(session, snap);
   } else if (phase === 'PUSHED') {
     document.getElementById('pushed-area').classList.remove('hidden');
-    document.getElementById('pushed-verdict').innerHTML = verdictHtml(session.last_result);
+    document.getElementById('pushed-verdict').innerHTML = verdictHtml(session.last_result, session.round);
+    const isGrab = !!(session.round && session.round.grab);
     const waiting = !!snap.pending;
-    document.querySelector('#pushed-area h2').textContent = waiting ? '等待应用计分板' : '已写入计分板';
-    document.getElementById('repush-btn').classList.toggle('hidden', waiting);
+    const silent = !!session.last_silent;
+    document.querySelector('#pushed-area h2').textContent =
+      isGrab ? '抢夺赛结果已记录（不上计分板）'
+        : (silent ? '本局结果已记录（局间不上计分板）'
+          : (waiting ? '等待应用计分板' : '已写入计分板'));
+    document.getElementById('repush-btn').classList.toggle('hidden', waiting || isGrab);
     document.querySelector('#pushed-area button.big').disabled = waiting;
   } else if (phase === 'MATCH_END') {
     document.getElementById('end-area').classList.remove('hidden');
@@ -101,25 +111,47 @@ window.onCabinetUpdate = function (data) {
   cabinets[data.machine_id] = data;
   const cell = document.getElementById('cab-' + cssSafe(data.machine_id));
   if (cell) {
+    const parts = [data.label, data.state].filter(Boolean);
     cell.querySelector('.st').textContent =
-      `${data.label || '-'} / ${data.state || '-'}` + (data.scores ? '　✓ 已抓分' : '');
+      (parts.length ? parts.join(' / ') : '-') + (data.scores ? '　✓ 已抓分' : '');
   }
 };
+
+async function captureScores(btn) {
+  const button = btn || document.getElementById('capture-btn');
+  setButtonBusy(button, true, '并行抓分中…');
+  try {
+    const resp = await postJSON('/api/scores/capture', {});
+    if (!resp.success) return;
+    const failed = Object.entries(resp.failed || {});
+    if (failed.length) {
+      toast('抓分失败：' + failed.map(([m, e]) => `${m}（${e}）`).join('；'), true);
+    } else {
+      toast(`已抓分 ${(resp.captured || []).length} 台机台`);
+    }
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
 
 function cssSafe(s) { return String(s).replace(/[^a-zA-Z0-9]/g, '_'); }
 
 let manualPlayers = [];
+let currentJudgeBy = 'ex';
+
+function scoreMetricLabel() { return currentJudgeBy === 'bp' ? 'BP' : 'EX 分'; }
 
 function toggleManual() {
   const area = document.getElementById('manual-entry');
   area.classList.toggle('hidden');
   if (area.classList.contains('hidden')) return;
+  document.getElementById('manual-score-header').textContent = scoreMetricLabel();
   const tbody = document.getElementById('manual-rows');
   tbody.innerHTML = '';
   for (const player of manualPlayers) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td><b>${esc(player)}</b></td>
-      <td><input class="ex-input manual-ex" type="number" data-player="${esc(player)}"></td>`;
+      <td><input class="manual-ex" type="number" data-player="${esc(player)}"></td>`;
     tbody.appendChild(tr);
   }
 }
@@ -137,9 +169,15 @@ async function submitManual() {
 }
 
 function renderLiveTitle(round) {
-  document.getElementById('live-title').textContent = round.mode === 'team'
-    ? `第 ${round.round_no}/${round.total_rounds} 回合进行中（${esc(round.type)} ${esc(round.theme || '')}）`
-    : `${esc(round.group)} 组第 ${round.round_no} 局进行中`;
+  if (round.mode !== 'team') {
+    document.getElementById('live-title').textContent = `${esc(round.group)} 组第 ${round.round_no} 局进行中`;
+    return;
+  }
+  const gameInfo = round.total_games > 1 ? `　第 ${round.game_no}/${round.total_games} 局` : '';
+  const tieInfo = round.tiebreaker ? '（加赛）' : '';
+  const bpInfo = round.judge_by === 'bp' ? '　· 比 BP（miss count 少者胜）' : '';
+  document.getElementById('live-title').textContent =
+    `第 ${round.round_no}/${round.total_rounds} 回合${gameInfo}${tieInfo}进行中（${esc(round.type)} ${esc(round.theme || '')}）${bpInfo}`;
 }
 
 function renderCabinets(snap) {
@@ -158,6 +196,7 @@ function renderTestScorePanel(session, snap) {
   const panel = document.getElementById('test-score-panel');
   panel.classList.toggle('hidden', !snap.test_mode);
   if (!snap.test_mode) return;
+  const metric = (session.round && session.round.judge_by) === 'bp' ? ' BP' : '';
   const forms = document.getElementById('test-score-forms');
   const machines = [...new Set(Object.values(session.assignments).map(slot => slot.machine))];
   forms.innerHTML = '';
@@ -169,8 +208,8 @@ function renderTestScorePanel(session, snap) {
     row.className = 'test-score-row';
     row.innerHTML = `
       <b>${esc(machine)}</b><span>${players}</span>
-      <label>1P <input class="test-score-input" data-side="1p" type="number" min="0"></label>
-      <label>2P <input class="test-score-input" data-side="2p" type="number" min="0"></label>
+      <label>1P${metric} <input class="test-score-input" data-side="1p" type="number" min="0"></label>
+      <label>2P${metric} <input class="test-score-input" data-side="2p" type="number" min="0"></label>
       <button type="button">提交</button>`;
     row.querySelector('button').onclick = () => submitTestScores(machine, row);
     forms.appendChild(row);
@@ -195,16 +234,34 @@ async function submitTestScores(machine, row) {
   }
 }
 
-function verdictHtml(result) {
+function verdictHtml(result, round) {
   if (!result) return '';
   if (result.mode === 'team') {
     const w = result.winner === 'draw' ? '平局' : (result.winner === 'left' ? '左队胜' : '右队胜');
-    return `判定：左 ${result.left_points} — 右 ${result.right_points}（${w}）`;
+    let prefix = '判定';
+    if (round && round.total_games > 1) {
+      prefix = `第 ${round.game_no}/${round.total_games} 局判定`;
+    }
+    if (round && round.tiebreaker) {
+      prefix = '加赛判定';
+    }
+    if (round && round.grab) {
+      prefix = '抢夺赛判定';
+    }
+    return `${prefix}：左 ${result.left_points} — 右 ${result.right_points}（${w}）`;
   }
-  return '名次：' + (result.ranking || []).map(esc).join(' &gt; ');
+  const ranking = result.ranking || [];
+  const ranks = result.ranks || {};
+  return '名次：' + ranking.map(p => {
+    const r = ranks[p];
+    return r ? `${esc(p)}(第${r}名)` : esc(p);
+  }).join(' &gt; ');
 }
 
 function renderReview(session, snap) {
+  document.getElementById('manual-entry').classList.add('hidden');
+  const judgeBy = (session.round && session.round.judge_by) || 'ex';
+  document.getElementById('review-score-header').textContent = judgeBy === 'bp' ? 'BP' : 'EX 分';
   renderScreenshots(session, snap.screenshots || {});
   const tbody = document.getElementById('score-rows');
   tbody.innerHTML = '';
@@ -217,7 +274,14 @@ function renderReview(session, snap) {
       <td><input class="ex-input" type="number" data-player="${esc(player)}" value="${scores[player] ?? ''}"></td>`;
     tbody.appendChild(tr);
   }
-  document.getElementById('verdict').innerHTML = verdictHtml(session.last_result);
+  const incomplete = (session.last_result && session.last_result.incomplete) || [];
+  const verdictEl = document.getElementById('verdict');
+  if (incomplete.length) {
+    verdictEl.innerHTML =
+      `<span class="warn-list">未识别到成绩：${incomplete.map(esc).join('、')}，请对照截图补录或重新抓分后再确认</span>`;
+  } else {
+    verdictEl.innerHTML = verdictHtml(session.last_result, session.round);
+  }
 }
 
 function renderScreenshots(session, screenshots) {
@@ -264,7 +328,17 @@ async function confirmScores() {
   setButtonBusy(button, true, '切换计分板并等待…');
   try {
     const resp = await postJSON('/api/round/confirm', { scores });
-    if (resp.success) toast('已创建计分板待应用，请在顶部确认');
+    if (resp.success) {
+      if (resp.grab) {
+        toast(resp.grab_done
+          ? '抢夺赛已全部结束，请在下一回合页面录入初始 PT'
+          : '抢夺赛结果已记录（不上计分板）');
+      } else if (resp.continued) {
+        toast('本局已记录，请准备下一局');
+      } else {
+        toast('已创建计分板待应用，请在顶部确认');
+      }
+    }
   } finally {
     setButtonBusy(button, false);
   }
@@ -289,7 +363,7 @@ async function advance() {
 function renderEnd(session) {
   const summary = session.summary || {};
   let html;
-  if (session.mode === 'knockout' && summary.final_ranking) {
+  if (session.mode !== 'team' && summary.final_ranking) {
     const medals = ['🥇', '🥈', '🥉', '4.'];
     html = '<p>' + summary.final_ranking.map((p, i) => `${medals[i] || ''} ${esc(p)}`).join('<br>') + '</p>';
   } else if (session.mode === 'team') {

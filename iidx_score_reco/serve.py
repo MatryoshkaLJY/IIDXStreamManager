@@ -15,7 +15,6 @@ IIDX 分数识别推理服务
 """
 
 import argparse
-import io
 import json
 import socket
 import struct
@@ -24,8 +23,8 @@ import threading
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import cv2
 import numpy as np
-from PIL import Image
 
 # 导入识别器
 from recognizer import IIDXDigitRecognizer
@@ -153,33 +152,21 @@ def handle_client(
             # 读取图像数据
             img_bytes = recv_exact(conn, length)
 
-            # 转换为 PIL Image
-            img = Image.open(io.BytesIO(img_bytes))
-            # 转换为 RGB (如果是 RGBA 或其他模式)
-            if img.mode != 'RGB':
-                img = img.convert('RGB')
+            # 直接在内存中解码为 BGR 图像（支持 JPEG/PNG 等常见格式）
+            img = cv2.imdecode(np.frombuffer(img_bytes, dtype=np.uint8), cv2.IMREAD_COLOR)
+            if img is None:
+                raise ValueError("无法解码图像数据")
 
             # 检查图像尺寸，如果需要则缩放
-            current_width, current_height = img.size
+            current_height, current_width = img.shape[:2]
             target_width, target_height = target_size
 
             if (current_width, current_height) != (target_width, target_height):
-                # 图像尺寸不匹配，进行缩放
                 print(f"[调试] 图像尺寸 {current_width}x{current_height} 与目标 {target_width}x{target_height} 不匹配，进行缩放")
-                img = img.resize((target_width, target_height), Image.LANCZOS)
+                img = cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_AREA)
 
-            # 保存为临时文件
-            import tempfile
-            with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                tmp_path = tmp.name
-                img.save(tmp_path)
-
-            try:
-                # 识别所有 ROI
-                results = recognizer.recognize_all_rois(tmp_path, rois, debug=False)
-            finally:
-                # 清理临时文件
-                Path(tmp_path).unlink(missing_ok=True)
+            # 识别所有 ROI（内存版，无需临时文件）
+            results = recognizer.recognize_all_rois_array(img, rois, debug=False)
 
             # 验证1P和2P分数的合法性
             validated_results = validate_score_result(results)

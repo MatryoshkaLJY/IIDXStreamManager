@@ -20,8 +20,11 @@ ACTUAL_SCENES = (
     "SP_Arena",
     "DP_BPL",
     "DP_Arena",
+    "Team_Scoreboard",
+    "Knockout_Scoreboard",
     "Live",
     "Scoreboard_web",
+    "Grid",
 )
 
 

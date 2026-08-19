@@ -25,9 +25,13 @@ from .obs.client import OBSClient
 from .obs.monitor import CabinetMonitor
 from .push.overlay import (
     OverlayPusher,
+    _hue_values,
+    _text_values,
     match_end_payload,
     round_result_payload,
     round_start_payload,
+    set_hue_payload,
+    set_text_payload,
     template_for_scene,
 )
 from .push.scoreboard import (
@@ -40,14 +44,21 @@ from .push.scoreboard import (
 )
 from .state import RuntimeState, load_runtime_state, save_runtime_state
 from .scene import PendingError, SceneCoordinator
+from .serial_audio import SerialAudioSwitcher, list_serial_ports
 from .services import DependencyManager
 from .screenshots import EMPTY_SCREENSHOT_PNG, ScreenshotStore, round_key_for_session
 
 logger = logging.getLogger(__name__)
 
 WEB_PORT = 5003
-SCOREBOARD_SETTLE_SECONDS = 5.0
+SCOREBOARD_SETTLE_SECONDS = 0.0
 MONOREPO_ROOT = Path(__file__).resolve().parents[2]
+MODE_SCOREBOARD_SCENES = {
+    "team": "Team_Scoreboard",
+    "knockout": "Knockout_Scoreboard",
+    "knockout_ef": "Knockout_Scoreboard",
+    "knockout_final": "Knockout_Scoreboard",
+}
 
 
 class AppContext:
@@ -69,6 +80,9 @@ class AppContext:
         self.scenes = SceneCoordinator(self.state.scenes)
         self.current_scene: str | None = None
         self.screenshots = ScreenshotStore()
+        self.serial_audio = SerialAudioSwitcher.from_dict(self.state.serial_audio)
+        self.overlay_text_overrides: dict[str, str] = {}
+        self.overlay_hue_overrides: dict[str, float] = {}
         self.sleep = time.sleep
         self.lock = threading.RLock()
 
@@ -87,6 +101,9 @@ class AppContext:
         self.state.obs_host = host
         self.state.obs_port = port
         save_runtime_state(self.state)
+        # 机台监控可能已在密码录入前启动，同步最新连接参数
+        if self.monitor is not None:
+            self.monitor.update_credentials(host, port, password)
 
     def try_switch_scene(self, scene: str | None, warnings: list[str]) -> bool:
         """切场景失败只记警告，不阻断流程。"""
@@ -113,29 +130,37 @@ class AppContext:
         apply_visibility = getattr(self.obs, "apply_match_visibility", None)
         if apply_visibility is None:
             return
-        apply_visibility(scene, session.play_type, session.assignments, team_by_player)
+        apply_visibility(
+            scene, session.play_type, session.assignments, team_by_player,
+            individual=session.mode != "team",
+        )
 
     def switch_scoreboard_and_push(self, payloads, warnings: list[str]) -> None:
-        switched = self.try_switch_scene(self.state.scenes.get("scoreboard"), warnings)
+        switched = self.try_switch_scene(self.scoreboard_scene(), warnings)
         if switched:
             self.sleep(SCOREBOARD_SETTLE_SECONDS)
         self.scoreboard.push_all(payloads)
 
-    def save_score_screenshot(self, machine_id: str, png: bytes) -> None:
+    def scoreboard_scene(self, mode: str | None = None) -> str:
+        selected_mode = mode or (self.session.mode if self.session is not None else self.state.mode)
+        return MODE_SCOREBOARD_SCENES.get(selected_mode, MODE_SCOREBOARD_SCENES["team"])
+
+    def save_score_screenshot(self, machine_id: str, data: bytes, ext: str = ".png") -> Path | None:
+        """保存成绩截图，返回保存路径；会话状态不允许保存时返回 None。"""
         with self.lock:
             if self.session is None or self.session.phase not in (
                 SessionPhase.LIVE,
                 SessionPhase.REVIEW,
             ):
-                return
+                return None
             assigned_machines = {slot["machine"] for slot in self.session.assignments.values()}
             if machine_id not in assigned_machines:
-                return
-            self.screenshots.save(round_key_for_session(self.session), machine_id, png)
+                return None
+            return self.screenshots.save(round_key_for_session(self.session), machine_id, data, ext)
 
     # ---- 监控 ----
 
-    def start_monitor(self, on_scores, on_update, on_score_frame=None) -> None:
+    def start_monitor(self) -> None:
         self.stop_monitor()
         self.monitor = CabinetMonitor(
             obs_host=self.state.obs_host,
@@ -143,9 +168,6 @@ class AppContext:
             obs_password=self.obs_password,
             machines=self.state.machines,
             interval=self.state.monitor_interval,
-            on_scores=on_scores,
-            on_update=on_update,
-            on_score_frame=on_score_frame,
         )
         self.monitor.start()
 
@@ -161,19 +183,26 @@ class AppContext:
 
     def session_snapshot(self) -> dict[str, Any]:
         self.scenes.update_aliases(self.state.scenes)
+        scenes = dict(self.state.scenes)
+        scenes["scoreboard"] = self.scoreboard_scene()
         return {
             "session": self.session.snapshot() if self.session else None,
             "obs_connected": self.obs_connected(),
             "monitor_running": self.monitor_running(),
             "mode": self.state.mode,
             "test_mode": self.state.test_mode,
-            "scenes": self.state.scenes,
+            "scenes": scenes,
             "actual_scenes": list(self.scenes.snapshots),
             "machines": sorted(self.state.machines),
             "screenshots": self.screenshots.current_urls(self.session),
             "scene": self.current_scene,
             "scene_state": self.scenes.public_state(),
             "pending": self.scenes.pending.to_dict() if self.scenes.pending else None,
+            "serial_audio": self.serial_audio.to_dict(),
+            "overlay_text_overrides": dict(self.overlay_text_overrides),
+            "overlay_hue_overrides": dict(self.overlay_hue_overrides),
+            "overlay_text_defaults": _text_values(self.session, self.scene_template) if self.session else {},
+            "overlay_hue_defaults": _hue_values(self.session, self.scene_template) if self.session else {},
         }
 
 
@@ -302,6 +331,35 @@ def create_app(config_dir: Path | None = None):
         overlay_root = Path(__file__).resolve().parents[1] / "overlay"
         return send_from_directory(overlay_root, asset_path, max_age=0)
 
+    @app.post("/api/overlay/texts")
+    def api_overlay_texts():
+        """PREP 阶段导播在网页手动覆盖 overlay 文字。"""
+        data = request.get_json(silent=True) or {}
+        values = data.get("values") or {}
+        if not isinstance(values, dict):
+            return fail("values 必须是对象")
+        normalized = {str(k): str(v) for k, v in values.items()}
+        ctx.overlay_text_overrides.update(normalized)
+        ctx.overlay.push(set_text_payload(normalized))
+        return ok()
+
+    @app.post("/api/overlay/hues")
+    def api_overlay_hues():
+        """PREP 阶段导播在网页手动覆盖 overlay 背景 Hue。"""
+        data = request.get_json(silent=True) or {}
+        values = data.get("values") or {}
+        if not isinstance(values, dict):
+            return fail("values 必须是对象")
+        parsed: dict[str, float] = {}
+        for k, v in values.items():
+            try:
+                parsed[str(k)] = float(v)
+            except (TypeError, ValueError):
+                return fail(f"Hue 值必须为数字: {k}")
+        ctx.overlay_hue_overrides.update(parsed)
+        ctx.overlay.push(set_hue_payload(parsed))
+        return ok()
+
     # Serving the scoreboard pages from the director avoids file:// URLs in
     # OBS Browser Source and keeps all business endpoints on the loopback host.
     @app.get("/scoreboard/bpl/")
@@ -333,7 +391,8 @@ def create_app(config_dir: Path | None = None):
         path = ctx.screenshots.resolve(match_id, round_key, machine_id)
         if path is None:
             return fail("截图不存在")
-        return send_file(path, mimetype="image/png", max_age=0)
+        mimetype = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+        return send_file(path, mimetype=mimetype, max_age=0)
 
     @socketio.on("connect")
     def on_connect():
@@ -377,7 +436,7 @@ def create_app(config_dir: Path | None = None):
     @app.post("/api/mode")
     def api_mode():
         mode = request.get_json(force=True).get("mode")
-        if mode not in ("team", "knockout"):
+        if mode not in ("team", "knockout", "knockout_ef", "knockout_final"):
             return fail(f"未知模式: {mode!r}")
         ctx.state.mode = mode
         save_runtime_state(ctx.state)
@@ -401,11 +460,49 @@ def create_app(config_dir: Path | None = None):
         emit_session()
         return ok(test_mode=enabled)
 
+    @app.post("/api/serial-audio")
+    def api_serial_audio():
+        data = request.get_json(force=True)
+        with ctx.lock:
+            ctx.state.serial_audio = {
+                "enabled": bool(data.get("enabled", False)),
+                "port": data.get("port") or None,
+                "baudrate": int(data.get("baudrate", 9600)),
+                "timeout": float(data.get("timeout", 1.0)),
+            }
+            ctx.serial_audio = SerialAudioSwitcher.from_dict(ctx.state.serial_audio)
+            save_runtime_state(ctx.state)
+        emit_session()
+        return ok()
+
+    @app.get("/api/serial-audio/ports")
+    def api_serial_audio_ports():
+        return ok(ports=list_serial_ports())
+
+    @app.post("/api/serial-audio/switch")
+    def api_serial_audio_switch():
+        data = request.get_json(force=True)
+        try:
+            number = int(data.get("number"))
+        except (TypeError, ValueError):
+            return fail("缺少音频源编号")
+        with ctx.lock:
+            if not ctx.serial_audio.enabled:
+                return fail("串口音频切换未启用，请先在设置页启用并保存")
+            if not ctx.serial_audio.send_number(number):
+                return fail(f"音频源 {number} 切换失败，请检查串口设备连接")
+        return ok(number=number)
+
     @app.post("/api/config/upload")
     def api_config_upload():
         data = request.get_json(force=True)
         kind = data.get("kind")
-        filename = {"team": loader.TEAM_MATCH_FILE, "knockout": loader.KNOCKOUT_FILE}.get(kind)
+        filename = {
+            "team": loader.TEAM_MATCH_FILE,
+            "knockout": loader.KNOCKOUT_FILE,
+            "knockout_ef": loader.KNOCKOUT_EF_FILE,
+            "knockout_final": loader.KNOCKOUT_FINAL_FILE,
+        }.get(kind)
         if filename is None:
             return fail(f"未知配置类型: {kind!r}")
         try:
@@ -421,13 +518,22 @@ def create_app(config_dir: Path | None = None):
                 return ok(config=loader.load_team_match(ctx.config_dir).model_dump(by_alias=True))
             if kind == "knockout":
                 return ok(config=loader.load_knockout(ctx.config_dir).model_dump(by_alias=True))
+            if kind == "knockout_ef":
+                return ok(config=loader.load_knockout_ef(ctx.config_dir).model_dump(by_alias=True))
+            if kind == "knockout_final":
+                return ok(config=loader.load_knockout_final(ctx.config_dir).model_dump(by_alias=True))
         except ConfigError as exc:
             return fail(str(exc))
         return fail(f"未知配置类型: {kind!r}")
 
     @app.get("/api/config/template/<kind>")
     def api_config_template(kind: str):
-        templates = {"team": loader.TEAM_MATCH_TEMPLATE, "knockout": loader.KNOCKOUT_TEMPLATE}
+        templates = {
+            "team": loader.TEAM_MATCH_TEMPLATE,
+            "knockout": loader.KNOCKOUT_TEMPLATE,
+            "knockout_ef": loader.KNOCKOUT_EF_TEMPLATE,
+            "knockout_final": loader.KNOCKOUT_FINAL_TEMPLATE,
+        }
         if kind not in templates:
             return fail(f"未知配置类型: {kind!r}")
         return jsonify(templates[kind])
@@ -493,6 +599,12 @@ def create_app(config_dir: Path | None = None):
                 if ctx.state.mode == "team":
                     config = loader.load_team_match(ctx.config_dir)
                     init = ("bpl", bpl_init_payload(config))
+                elif ctx.state.mode == "knockout_ef":
+                    config = loader.load_knockout_ef(ctx.config_dir)
+                    init = ("knockout", knockout_init_payload(config))
+                elif ctx.state.mode == "knockout_final":
+                    config = loader.load_knockout_final(ctx.config_dir)
+                    init = ("knockout", knockout_init_payload(config))
                 else:
                     config = loader.load_knockout(ctx.config_dir)
                     init = ("knockout", knockout_init_payload(config))
@@ -506,6 +618,8 @@ def create_app(config_dir: Path | None = None):
             session.start()
             ctx.session = session
             ctx.current_scene = None
+            ctx.overlay_text_overrides.clear()
+            ctx.overlay_hue_overrides.clear()
             ctx.screenshots.start_match()
         emit_session()
         return ok()
@@ -517,6 +631,8 @@ def create_app(config_dir: Path | None = None):
                 return fail("没有进行中的比赛")
             ctx.session.abort()
             ctx.session = None
+            ctx.overlay_text_overrides.clear()
+            ctx.overlay_hue_overrides.clear()
             if ctx.scenes.pending is not None:
                 ctx.scenes.cancel()
         emit_session()
@@ -535,17 +651,33 @@ def create_app(config_dir: Path | None = None):
 
     @app.post("/api/round/begin")
     def api_round_begin():
+        audio_failed_machine: str | None = None
         with ctx.lock:
             session = _require_session()
             if set(session.assignments) != set(session.players_to_assign()):
                 return fail("尚未完成机台分配")
+            # 团队赛 1V1 时自动把音频输入源切到第一个选手（左队）使用的机台
+            if (
+                session.mode == "team"
+                and session.current_round_info().get("type") == "1v1"
+            ):
+                first_player = session.players_to_assign()[0]
+                machine_id = session.assignments[first_player]["machine"]
+                if not ctx.serial_audio.switch(machine_id) and ctx.serial_audio.enabled:
+                    audio_failed_machine = machine_id
             scene = request.get_json(force=True).get("scene") or _default_scene(ctx, session)
             actual_scene = ctx.scenes.resolve(scene)
             if actual_scene is None:
                 return fail("场景未配置")
             try:
                 ctx.scene_template = template_for_scene(actual_scene, session.mode)
-                payload = round_start_payload(session, ctx.scene_template, actual_scene)
+                payload = round_start_payload(
+                    session,
+                    ctx.scene_template,
+                    actual_scene,
+                    text_overrides=ctx.overlay_text_overrides,
+                    hue_overrides=ctx.overlay_hue_overrides,
+                )
                 data = payload["data"]
                 pending = ctx.scenes.create_pending(
                     actual_scene,
@@ -558,6 +690,12 @@ def create_app(config_dir: Path | None = None):
                 )
             except (SessionError, PendingError) as exc:
                 return fail(str(exc))
+        if audio_failed_machine is not None:
+            # 发送失败（含自动重试一次后仍失败），在页面上提示导播手动检查
+            socketio.emit(
+                "notice",
+                {"message": f"串口音频切换失败（{audio_failed_machine}），请检查设备连接"},
+            )
         emit_session()
         return ok(pending=pending.to_dict())
 
@@ -574,11 +712,68 @@ def create_app(config_dir: Path | None = None):
                 payloads = session.confirm(scores)
             except (SessionError, ValueError) as exc:
                 return fail(str(exc))
-            scoreboard_scene = ctx.scenes.resolve(ctx.state.scenes.get("scoreboard"))
+            session.last_silent = False
+            if not payloads and session.phase == SessionPhase.PUSHED:
+                # 抢夺赛回合结束：不上计分板、不切场景，仅在游戏画面上展示回合结果
+                overlay_payload = round_result_payload(
+                    session,
+                    ctx.scene_template,
+                    ctx.current_scene,
+                    text_overrides=ctx.overlay_text_overrides,
+                    hue_overrides=ctx.overlay_hue_overrides,
+                )
+                ctx.overlay.push(overlay_payload)
+                grab_done = (
+                    session.mode == "team"
+                    and session.round_index + 1 == session.config.grab_rounds
+                )
+                emit_session()
+                return ok(continued=True, grab=True, grab_done=grab_done)
+            # 团队赛当前回合还有下一局：立即更新 overlay 上的累计分数，再进入下一局 PREP
+            if not payloads:
+                overlay_payload = round_result_payload(
+                    session,
+                    ctx.scene_template,
+                    ctx.current_scene,
+                    text_overrides=ctx.overlay_text_overrides,
+                    hue_overrides=ctx.overlay_hue_overrides,
+                )
+                ctx.overlay.push(overlay_payload)
+                emit_session()
+                return ok(continued=True)
+            # 淘汰赛局间不切计分板场景：静默推送分数保持计分板数据同步，
+            # 仅在游戏画面上展示本局结果。切计分板场景的时机：
+            # 一场 4 局结束（含因并列进入加赛前展示一次）、加赛决出后。
+            if session.is_knockout:
+                tournament = session.tournament
+                if not tournament.should_show_scoreboard(session.group):
+                    warnings: list[str] = []
+                    try:
+                        ctx.scoreboard.push_all(payloads)
+                    except PushError as exc:
+                        warnings.append(f"计分板静默推送失败: {exc}")
+                    overlay_payload = round_result_payload(
+                        session,
+                        ctx.scene_template,
+                        ctx.current_scene,
+                        text_overrides=ctx.overlay_text_overrides,
+                        hue_overrides=ctx.overlay_hue_overrides,
+                    )
+                    ctx.overlay.push(overlay_payload)
+                    session.last_silent = True
+                    emit_session()
+                    return ok(continued=True, warnings=warnings)
+            scoreboard_scene = ctx.scenes.resolve(ctx.scoreboard_scene(session.mode))
             if scoreboard_scene is None:
                 return fail("计分板场景未配置")
             result_scene = ctx.current_scene or ctx.scenes.resolve(_default_scene(ctx, session)) or "Live"
-            result_payload = round_result_payload(session, ctx.scene_template, result_scene)
+            result_payload = round_result_payload(
+                session,
+                ctx.scene_template,
+                result_scene,
+                text_overrides=ctx.overlay_text_overrides,
+                hue_overrides=ctx.overlay_hue_overrides,
+            )
             try:
                 pending = ctx.scenes.create_pending(
                     scoreboard_scene,
@@ -595,7 +790,7 @@ def create_app(config_dir: Path | None = None):
 
     @app.post("/api/round/force_review")
     def api_round_force_review():
-        """抓分失败时的应急通道：手动录入本回合 EX 分进入确认环节。"""
+        """抓分失败时的应急通道：手动录入本回合成绩进入确认环节（BP 回合录 miss count）。"""
         with ctx.lock:
             session = _require_session()
             scores = {
@@ -615,7 +810,7 @@ def create_app(config_dir: Path | None = None):
             if not session.last_payloads:
                 return fail("没有待重推的载荷")
             if ctx.scenes.pending is None:
-                scoreboard_scene = ctx.scenes.resolve(ctx.state.scenes.get("scoreboard"))
+                scoreboard_scene = ctx.scenes.resolve(ctx.scoreboard_scene(session.mode))
                 if scoreboard_scene is None:
                     return fail("计分板场景未配置")
                 try:
@@ -643,6 +838,8 @@ def create_app(config_dir: Path | None = None):
                 session.advance()
             except SessionError as exc:
                 return fail(str(exc))
+            ctx.overlay_text_overrides.clear()
+            ctx.overlay_hue_overrides.clear()
             ended = session.phase == SessionPhase.MATCH_END
             if ended:
                 payload = match_end_payload(session, ctx.scene_template, ctx.current_scene or "Live")
@@ -658,6 +855,27 @@ def create_app(config_dir: Path | None = None):
                     )
         emit_session()
         return ok(match_end=ended)
+
+    @app.post("/api/scoreboard/init_scores")
+    def api_scoreboard_init_scores():
+        """抢夺赛结束后录入双方初始 PT，并重推 BPL 计分板 init。"""
+        with ctx.lock:
+            session = _require_session()
+            data = request.get_json(force=True)
+            try:
+                left, right = int(data.get("left", 0)), int(data.get("right", 0))
+            except (TypeError, ValueError):
+                return fail("初始 PT 必须是整数")
+            try:
+                session.set_initial_scores(left, right)
+            except SessionError as exc:
+                return fail(str(exc))
+            try:
+                ctx.scoreboard.push("bpl", bpl_init_payload(session.config, left, right))
+            except PushError as exc:
+                return fail(f"记分板 init 推送失败: {exc}")
+        emit_session()
+        return ok()
 
     @app.post("/api/scoreboard/reset")
     def api_scoreboard_reset():
@@ -676,20 +894,44 @@ def create_app(config_dir: Path | None = None):
         requested = request.get_json(force=True).get("scene")
         if not isinstance(requested, str) or not requested:
             return fail("缺少场景名")
-        scene = ctx.scenes.resolve(requested)
+        if requested.strip().lower().replace(" ", "").replace("_", "").replace("-", "") in {
+            "scoreboard", "scoreboardweb", "计分板"
+        }:
+            scene = ctx.scoreboard_scene()
+        else:
+            scene = ctx.scenes.resolve(requested)
         if scene is None:
             return fail("场景未配置")
-        try:
-            with ctx.lock:
-                pending = ctx.scenes.create_pending(
-                    scene,
-                    template_for_scene(scene, ctx.state.mode),
-                    source="shortcut",
-                )
-        except PendingError as exc:
-            return fail(str(exc))
+        with ctx.lock:
+            if ctx.scenes.pending is not None:
+                return fail("已有待应用的场景操作，请先确认、取消或重试")
+            if not ctx.obs_connected():
+                return fail("OBS 未连接")
+            warnings: list[str] = []
+            pending = ctx.scenes.create_pending(
+                scene,
+                template_for_scene(scene, ctx.state.mode),
+                source="shortcut",
+            )
+            try:
+                # 1. 先预推 overlay snapshot
+                if not _overlay_stage(pending):
+                    raise RuntimeError("overlay stage 未确认")
+                ctx.scenes.mark("staged")
+                # 2. 立即切换 OBS 场景
+                if not ctx.try_switch_scene(scene, warnings):
+                    raise RuntimeError(f"切换场景 {scene} 失败")
+                ctx.current_scene = scene
+                ctx.scenes.mark("scene_switched")
+                # 3. 激活 overlay
+                if not _overlay_activate(scene):
+                    raise RuntimeError("overlay activate 未确认")
+                ctx.scenes.complete()
+            except Exception as exc:
+                ctx.scenes.mark("failed", failed_stage=pending.status, error=str(exc))
+                return fail(str(exc))
         emit_session()
-        return ok(scene=scene, pending=pending.to_dict())
+        return ok(scene=scene, warnings=warnings)
 
     # ---- 监控 ----
 
@@ -700,7 +942,7 @@ def create_app(config_dir: Path | None = None):
             if action == "start":
                 if ctx.state.test_mode:
                     return ok(test_mode=True, message="测试模式无需启动机台监控")
-                ctx.start_monitor(_on_scores, _on_update, _on_score_frame)
+                ctx.start_monitor()
             elif action == "stop":
                 ctx.stop_monitor()
             else:
@@ -709,6 +951,56 @@ def create_app(config_dir: Path | None = None):
             return fail(f"监控{action}失败: {exc}")
         emit_session()
         return ok()
+
+    @app.post("/api/scores/capture")
+    def api_capture_scores():
+        """手动抓分：并行抓取当前回合所有分配机台的成绩画面并识别分数/BP。
+
+        无论是否识别出成绩都进入比分确认（REVIEW）；REVIEW 中也可重复
+        调用以重新抓分刷新成绩。
+        """
+        if ctx.state.test_mode:
+            return fail("测试模式无机台画面，请使用页面注入成绩")
+        with ctx.lock:
+            session = _require_session()
+            if session.phase not in (SessionPhase.LIVE, SessionPhase.REVIEW):
+                return fail(f"当前状态 {session.phase.value} 不能抓分")
+            machine_ids = sorted({slot["machine"] for slot in session.assignments.values()})
+        if not machine_ids:
+            return fail("当前回合没有分配机台")
+        if not ctx.monitor_running():
+            try:
+                ctx.start_monitor()
+            except Exception as exc:
+                return fail(f"启动机台连接失败: {exc}")
+
+        results = ctx.monitor.capture_scores(machine_ids)
+
+        captured: list[str] = []
+        failed: dict[str, str] = {}
+        warnings: list[str] = []
+        for machine_id, res in results.items():
+            if "error" in res:
+                failed[machine_id] = res["error"]
+                continue
+            if res.get("frame"):
+                _on_score_frame(machine_id, res["frame"], res.get("frame_ext", ".png"))
+            scores = res.get("scores") or {}
+            _on_scores(machine_id, scores)
+            captured.append(machine_id)
+            if scores.get("1p_valid") is not True and scores.get("2p_valid") is not True:
+                warnings.append(f"{machine_id} 分数校验未通过，请在确认页核对截图与分数")
+
+        # 无论是否收齐都进入比分确认；未识别到成绩的选手输入框留空，
+        # 由导播对照截图补录，或重新抓分刷新。
+        with ctx.lock:
+            missing = session.enter_review()
+            if missing:
+                warnings.append(
+                    "未识别到成绩：" + "、".join(missing) + "，已进入比分确认，请对照截图补录或重新抓分"
+                )
+        emit_session()
+        return ok(captured=captured, failed=failed, warnings=warnings)
 
     @app.post("/api/test/score")
     @app.post("/api/test/scores")
@@ -744,6 +1036,9 @@ def create_app(config_dir: Path | None = None):
             assigned_machines = {slot["machine"] for slot in session.assignments.values()}
             if machine_id not in assigned_machines:
                 return fail("该机台未分配给当前回合")
+            if session.current_round_info().get("judge_by") == "bp":
+                # BP 判定回合：注入的成绩作为 miss count（{side}score → {side}bp）
+                scores = {k.removesuffix("score") + "bp": v for k, v in scores.items()}
             ctx.save_score_screenshot(machine_id, EMPTY_SCREENSHOT_PNG)
             transitioned = session.on_machine_scores(machine_id, scores)
         socketio.emit(
@@ -754,17 +1049,7 @@ def create_app(config_dir: Path | None = None):
             emit_session()
         return ok(machine_id=machine_id, scores=scores, phase=session.phase.value)
 
-    # ---- 监控回调（monitor 线程） ----
-
-    def _on_update(result: dict[str, Any]) -> None:
-        socketio.emit(
-            "cabinet_update",
-            {
-                "machine_id": result.get("machine_id"),
-                "label": result.get("label"),
-                "state": result.get("state"),
-            },
-        )
+    # ---- 监控回调与手动抓分 ----
 
     def _on_scores(machine_id: str, scores: dict[str, Any]) -> None:
         with ctx.lock:
@@ -779,8 +1064,11 @@ def create_app(config_dir: Path | None = None):
         if transitioned:
             emit_session()
 
-    def _on_score_frame(machine_id: str, png: bytes) -> None:
-        ctx.save_score_screenshot(machine_id, png)
+    def _on_score_frame(machine_id: str, frame: bytes, ext: str = ".png") -> None:
+        path = ctx.save_score_screenshot(machine_id, frame, ext)
+        if path is not None:
+            logger.info("机台 %s 成绩截图已保存: %s", machine_id, path)
+            socketio.emit("notice", {"message": f"已保存成绩截图：{path.name}"})
 
     # ---- 工具 ----
 

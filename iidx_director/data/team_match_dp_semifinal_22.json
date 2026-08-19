@@ -1,0 +1,188 @@
+{
+  "playType": "DP",
+  "stageName": "セミファイナルステージ",
+  "matchNumber": 1,
+  "leftTeam": {
+    "name": "SDPS",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#F2370F",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "RIO",
+      "UmFish",
+      "Kodak",
+      "NEGI",
+      "MM",
+      "C*era",
+      "RUN",
+      "C.M.Y.K"
+    ]
+  },
+  "rightTeam": {
+    "name": "中4 CLUB",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1B6EE3",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "W",
+      "NEMESIS",
+      "1noharaP",
+      "Zzu.",
+      "YT",
+      "S9RYNE",
+      "P3",
+      "T"
+    ]
+  },
+  "grabRounds": 0,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "SOF-LAN",
+      "games": [
+        {
+    
+          "leftPlayers": ["RIO"],
+          "rightPlayers": ["W"]
+        },
+        {
+    
+          "leftPlayers": ["RIO"],
+          "rightPlayers": ["W"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+    
+          "leftPlayers": ["UmFish"],
+          "rightPlayers": ["NEMESIS"]
+        },
+        {
+    
+          "leftPlayers": ["UmFish"],
+          "rightPlayers": ["NEMESIS"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+    
+          "leftPlayers": ["Kodak"],
+          "rightPlayers": ["1noharaP"]
+        },
+        {
+    
+          "leftPlayers": ["Kodak"],
+          "rightPlayers": ["1noharaP"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD",
+      "games": [
+        {
+    
+          "leftPlayers": ["NEGI"],
+          "rightPlayers": ["Zzu."]
+        },
+        {
+    
+          "leftPlayers": ["NEGI"],
+          "rightPlayers": ["Zzu."]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK",
+      "games": [
+        {
+    
+          "leftPlayers": ["MM"],
+          "rightPlayers": ["YT"]
+        },
+        {
+    
+          "leftPlayers": ["MM"],
+          "rightPlayers": ["YT"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+    
+          "leftPlayers": ["C*era"],
+          "rightPlayers": ["S9RYNE"]
+        },
+        {
+    
+          "leftPlayers": ["C*era"],
+          "rightPlayers": ["S9RYNE"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+    
+          "leftPlayers": ["RUN"],
+          "rightPlayers": ["P3"]
+        },
+        {
+    
+          "leftPlayers": ["RUN"],
+          "rightPlayers": ["P3"]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+    
+          "leftPlayers": ["C.M.Y.K"],
+          "rightPlayers": ["T"]
+        },
+        {
+    
+          "leftPlayers": ["C.M.Y.K"],
+          "rightPlayers": ["T"]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    }
+  ]
+}

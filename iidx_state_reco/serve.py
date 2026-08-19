@@ -7,19 +7,17 @@
   接收: [标签字符串\n]  例如 "play\n"
 
 用法：
-  python3 serve.py --model classifier.onnx               # Unix socket: /tmp/iidx_infer.sock
-  python3 serve.py --model classifier.onnx --tcp 9876    # TCP 127.0.0.1:9876
-  python3 serve.py --model classifier.onnx --sock /run/iidx.sock
+  python3 serve.py --model classifier_augmented_medium.onnx --tcp 9876    # TCP 127.0.0.1:9876
+  python3 serve.py --model classifier_augmented_medium.onnx --sock /run/iidx.sock  # Linux 开发模式
 
-测试（需要 socat）：
-  # Unix socket
-  ( printf "\\x00\\x00\\x1a\\x2b"; cat frame.jpg ) | socat - UNIX-CONNECT:/tmp/iidx_infer.sock
+测试：业务端统一使用 TCP 9876；Linux 开发环境也可显式传入本地 socket 路径。
 
 依赖: pip install onnxruntime pillow  (GPU: pip install onnxruntime-gpu)
 """
 
 import argparse
 import io
+import os
 import socket
 import struct
 import sys
@@ -107,12 +105,19 @@ def handle_client(conn: socket.socket, addr, sess, input_name: str, labels: list
 
 def main():
     parser = argparse.ArgumentParser(description="IIDX 状态识别推理服务")
-    parser.add_argument("--model", default="classifier.onnx", help="ONNX 模型路径")
+    parser.add_argument("--model", default="classifier_augmented_medium.onnx", help="ONNX 模型路径")
     parser.add_argument("--labels", default=None, help="标签文件（默认同模型名.labels.txt）")
-    parser.add_argument("--sock", default="/tmp/iidx_infer.sock", help="Unix socket 路径")
+    parser.add_argument("--sock", default=None, help="Linux 开发模式 Unix socket 路径")
     parser.add_argument("--tcp", type=int, default=None, metavar="PORT",
                         help="改用 TCP，指定端口（如 9876）")
     args = parser.parse_args()
+
+    # Windows has no portable Unix-domain socket deployment path.  The
+    # business package therefore always uses the loopback TCP protocol.
+    if args.tcp is None and args.sock is None:
+        args.tcp = 9876 if os.name == "nt" else None
+        if args.tcp is None:
+            args.sock = "iidx_infer.sock"
 
     import onnxruntime as ort
 

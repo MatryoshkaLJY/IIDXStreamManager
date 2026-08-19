@@ -12,6 +12,16 @@
     <div id="round-detail"></div>
   </div>
 
+  <div class="card hidden" id="init-scores-card">
+    <h2>抢夺赛初始 PT</h2>
+    <p class="hint">抢夺赛已全部结束。请按奖励抽取结果录入双方初始 PT，提交后将推送计分板 init（计分板只显示正赛回合）。</p>
+    <div class="row">
+      <label>左队 PT <input id="init-left" type="number" min="0" value="0" style="width:80px"></label>
+      <label>右队 PT <input id="init-right" type="number" min="0" value="0" style="width:80px"></label>
+      <button onclick="submitInitScores()">提交初始 PT</button>
+    </div>
+  </div>
+
   <div class="card">
     <h2>机台分配</h2>
     <table>
@@ -24,6 +34,13 @@
     </div>
     <button class="big" onclick="beginRound()">✓ 创建开始待应用</button>
     <div class="hint">确认后将：写入 overlay、切换 OBS、进入抓分状态。请先确认监控已启动。</div>
+  </div>
+
+  <div class="card" id="overlay-editor" style="display:none">
+    <h2>Overlay 内容微调</h2>
+    <p class="hint">比赛准备阶段可在此临时覆盖 OBS overlay 上的文字与色调，开始回合后仍可继续调整，直到进入 LIVE。</p>
+    <div id="overlay-texts"><h3>文字</h3></div>
+    <div id="overlay-hues"><h3>色调</h3></div>
   </div>
 </div>
 {% endblock %}
@@ -45,19 +62,173 @@ window.onSessionUpdate = function (snap) {
   }
   renderRound(session.round, snap);
   renderAssignments(session.round, session.assignments, snap);
+  renderInitScores(session);
+  renderOverlayEditor(session, snap);
 };
+
+function renderInitScores(session) {
+  // 首个正赛回合且尚未录入初始 PT 时，提示导播录入抢夺赛初始 PT
+  const show = session.mode === 'team'
+    && session.grab_rounds > 0
+    && session.round
+    && !session.round.grab
+    && session.round.round_no === session.grab_rounds + 1
+    && !session.initial_scores;
+  document.getElementById('init-scores-card').classList.toggle('hidden', !show);
+}
+
+function debounce(fn, ms) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+function overlayTextDefaults(session, snap) {
+  const defaults = Object.assign({}, snap.overlay_text_defaults || {});
+  const overrides = snap.overlay_text_overrides || {};
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined && value !== null) defaults[key] = String(value);
+  }
+  return defaults;
+}
+
+const OVERLAY_TEXT_FIELDS = {
+  header_theme: '主题',
+  left_team_name: '左队名',
+  right_team_name: '右队名',
+  left_player: '左选手',
+  right_player: '右选手',
+  left_points: '左分数',
+  right_points: '右分数',
+  machine_1_player: '1号机选手',
+  machine_2_player: '2号机选手',
+  machine_3_player: '3号机选手',
+  machine_4_player: '4号机选手',
+};
+
+function renderOverlayEditor(session, snap) {
+  const card = document.getElementById('overlay-editor');
+  const textsDiv = document.getElementById('overlay-texts');
+  const huesDiv = document.getElementById('overlay-hues');
+  if (!card || !textsDiv || !huesDiv) return;
+  card.style.display = 'block';
+
+  const defaults = overlayTextDefaults(session, snap);
+  const hueOverrides = snap.overlay_hue_overrides || {};
+  const hueDefaults = snap.overlay_hue_defaults || {};
+  const effectiveHue = key => {
+    if (hueOverrides[key] !== undefined) return hueOverrides[key];
+    return hueDefaults[key] ?? 0;
+  };
+
+  const isFirst = !textsDiv.dataset.initialized;
+  let changedTexts, changedHues;
+  if (isFirst) {
+    changedTexts = new Set();
+    changedHues = new Set();
+    textsDiv.innerHTML = '<h3>文字</h3>';
+    for (const [key, label] of Object.entries(OVERLAY_TEXT_FIELDS)) {
+      const value = defaults[key] || '';
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<label style="display:flex;gap:8px;align-items:center;width:100%">${label}<input type="text" data-overlay-key="${key}" value="${esc(value)}" placeholder="${esc(value) || label}" style="flex:1"></label>`;
+      textsDiv.appendChild(row);
+    }
+
+    huesDiv.innerHTML = '<h3>色调</h3>';
+    const hueFields = [];
+    if (session.mode === 'team') {
+      hueFields.push(['left', '左队']);
+      hueFields.push(['right', '右队']);
+    }
+    for (let i = 1; i <= 4; i++) hueFields.push([`machine_${i}`, `${i}号机`]);
+    for (const [key, label] of hueFields) {
+      const value = effectiveHue(key);
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `<label style="display:flex;gap:8px;align-items:center;width:100%">${label}<input type="range" min="-180" max="180" value="${value}" data-overlay-hue="${key}" style="flex:1"></label>`;
+      huesDiv.appendChild(row);
+    }
+
+    const sendTexts = debounce(() => {
+      const values = {};
+      textsDiv.querySelectorAll('input[data-overlay-key]').forEach(inp => {
+        if (changedTexts.has(inp.dataset.overlayKey)) {
+          values[inp.dataset.overlayKey] = inp.value;
+        }
+      });
+      postJSON('/api/overlay/texts', { values });
+    }, 300);
+
+    const sendHues = debounce(() => {
+      const values = {};
+      huesDiv.querySelectorAll('input[data-overlay-hue]').forEach(inp => {
+        if (changedHues.has(inp.dataset.overlayHue)) {
+          values[inp.dataset.overlayHue] = Number(inp.value);
+        }
+      });
+      postJSON('/api/overlay/hues', { values });
+    }, 100);
+
+    textsDiv.querySelectorAll('input[data-overlay-key]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        changedTexts.add(inp.dataset.overlayKey);
+        sendTexts();
+      });
+    });
+    huesDiv.querySelectorAll('input[data-overlay-hue]').forEach(inp => {
+      inp.addEventListener('input', () => {
+        changedHues.add(inp.dataset.overlayHue);
+        sendHues();
+      });
+    });
+
+    textsDiv.dataset.initialized = 'true';
+  } else {
+    textsDiv.querySelectorAll('input[data-overlay-key]').forEach(inp => {
+      const key = inp.dataset.overlayKey;
+      if (document.activeElement === inp || changedTexts.has(key)) return;
+      const value = defaults[key] || '';
+      inp.value = value;
+      inp.placeholder = value || OVERLAY_TEXT_FIELDS[key];
+    });
+    huesDiv.querySelectorAll('input[data-overlay-hue]').forEach(inp => {
+      const key = inp.dataset.overlayHue;
+      if (document.activeElement === inp || changedHues.has(key)) return;
+      inp.value = effectiveHue(key);
+    });
+  }
+}
+
+async function submitInitScores() {
+  const left = parseInt(document.getElementById('init-left').value);
+  const right = parseInt(document.getElementById('init-right').value);
+  if (Number.isNaN(left) || Number.isNaN(right)) {
+    toast('请输入有效 PT', true);
+    return;
+  }
+  const resp = await postJSON('/api/scoreboard/init_scores', { left, right });
+  if (resp.success) toast('初始 PT 已录入并推送计分板 init');
+}
 
 function renderRound(round, snap) {
   let title, detail = '';
   if (round.mode === 'team') {
-    title = `${esc(round.left_team)} vs ${esc(round.right_team)} — 第 ${round.round_no}/${round.total_rounds} 回合`;
+    const gameInfo = round.total_games > 1 ? `　第 ${round.game_no}/${round.total_games} 局` : '';
+    const tieInfo = round.tiebreaker ? '（加赛）' : '';
+    const grabInfo = round.grab ? '（抢夺赛）' : '';
+    title = `${esc(round.left_team)} vs ${esc(round.right_team)} — 第 ${round.round_no}/${round.total_rounds} 回合${gameInfo}${tieInfo}${grabInfo}`;
     detail = `<p>${esc(round.play_type || 'SP')}　类型 ${esc(round.type)}　主题 ${esc(round.theme || '-')}　分值 ${round.points}</p>
       <p>${esc(round.left_players.join('、'))} 对阵 ${esc(round.right_players.join('、'))}</p>`;
     const playType = round.play_type === 'DP' ? 'dp' : 'sp';
     const sceneKey = `team_${playType}_${round.type === '2v2' ? '2v2' : '1v1'}`;
     setDefaultScene(snap.scenes[sceneKey] || snap.scenes[`team_${playType}`] || snap.scenes.team_sp || '');
   } else {
-    title = `淘汰赛 ${esc(round.group)} 组 — 第 ${round.round_no} 局${round.tiebreaker ? '（平局决胜）' : ''}`;
+    title = round.tiebreaker
+      ? `淘汰赛 ${esc(round.group)} 组 — 平局决胜（加赛）`
+      : `淘汰赛 ${esc(round.group)} 组 — 第 ${round.round_no} 局`;
     detail = `<p>选手：${round.players.map(esc).join('、')}</p>`;
     const sceneKey = round.play_type === 'DP' ? 'individual_dp' : 'individual_sp';
     setDefaultScene(snap.scenes[sceneKey] || snap.scenes.individual_sp || snap.scenes.individual || '');

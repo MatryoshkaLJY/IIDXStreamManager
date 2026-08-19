@@ -10,13 +10,15 @@ from pathlib import Path
 
 from pydantic import BaseModel, ValidationError
 
-from .models import KnockoutConfig, TeamMatchConfig
+from .models import KnockoutConfig, KnockoutEFConfig, KnockoutFinalConfig, TeamMatchConfig
 
 MODULE_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_DIR = MODULE_ROOT / "data"
 
 TEAM_MATCH_FILE = "team_match.json"
 KNOCKOUT_FILE = "knockout.json"
+KNOCKOUT_EF_FILE = "knockout_ef.json"
+KNOCKOUT_FINAL_FILE = "knockout_final.json"
 
 TEAM_MATCH_TEMPLATE = {
     "playType": "SP",
@@ -34,20 +36,26 @@ TEAM_MATCH_TEMPLATE = {
         "colors": {"primary": "#1a3a6b", "secondary": "#ffffff"},
         "players": ["选手R1", "选手R2"],
     },
+    "grabRounds": 0,
     "rounds": [
         {
             "type": "1v1",
-            "theme": "SCRATCH",
-            "leftPlayers": ["选手L1"],
-            "rightPlayers": ["选手R1"],
             "points": 1,
+            "theme": "SCRATCH",
+            "judgeBy": "ex",
+            "games": [
+                {"leftPlayers": ["选手L1"], "rightPlayers": ["选手R1"]},
+                {"leftPlayers": ["选手L1"], "rightPlayers": ["选手R1"]},
+            ],
         },
         {
             "type": "2v2",
-            "theme": "CHARGE",
-            "leftPlayers": ["选手L1", "选手L2"],
-            "rightPlayers": ["选手R1", "选手R2"],
             "points": 2,
+            "theme": "CHARGE",
+            "games": [
+                {"leftPlayers": ["选手L1", "选手L2"], "rightPlayers": ["选手R1", "选手R2"]},
+                {"leftPlayers": ["选手L1", "选手L2"], "rightPlayers": ["选手R1", "选手R2"]},
+            ],
         },
     ],
 }
@@ -63,9 +71,28 @@ KNOCKOUT_TEMPLATE = {
     },
 }
 
+KNOCKOUT_EF_TEMPLATE = {
+    "playType": "SP",
+    "tournamentName": "8人淘汰赛",
+    "groups": {
+        "E": ["E1", "E2", "E3", "E4"],
+        "F": ["F1", "F2", "F3", "F4"],
+    },
+}
+
+KNOCKOUT_FINAL_TEMPLATE = {
+    "playType": "SP",
+    "tournamentName": "淘汰赛决赛",
+    "groups": {
+        "finals": ["FIN1", "FIN2", "FIN3", "FIN4"],
+    },
+}
+
 _TEMPLATES = {
     TEAM_MATCH_FILE: TEAM_MATCH_TEMPLATE,
     KNOCKOUT_FILE: KNOCKOUT_TEMPLATE,
+    KNOCKOUT_EF_FILE: KNOCKOUT_EF_TEMPLATE,
+    KNOCKOUT_FINAL_FILE: KNOCKOUT_FINAL_TEMPLATE,
 }
 
 
@@ -106,11 +133,24 @@ def load_knockout(config_dir: Path = CONFIG_DIR) -> KnockoutConfig:
     return _load(KNOCKOUT_FILE, KnockoutConfig, config_dir)  # type: ignore[return-value]
 
 
+def load_knockout_ef(config_dir: Path = CONFIG_DIR) -> KnockoutEFConfig:
+    return _load(KNOCKOUT_EF_FILE, KnockoutEFConfig, config_dir)  # type: ignore[return-value]
+
+
+def load_knockout_final(config_dir: Path = CONFIG_DIR) -> KnockoutFinalConfig:
+    return _load(KNOCKOUT_FINAL_FILE, KnockoutFinalConfig, config_dir)  # type: ignore[return-value]
+
+
 def save_config(filename: str, payload: str | bytes, config_dir: Path = CONFIG_DIR) -> BaseModel:
     """保存上传的赛程 JSON（先校验再落盘，旧文件备份为 .bak）。返回校验后的模型。"""
     if filename not in _TEMPLATES:
         raise ConfigError(f"未知的配置文件名: {filename}")
-    model = {"team_match.json": TeamMatchConfig, "knockout.json": KnockoutConfig}[filename]
+    model = {
+        "team_match.json": TeamMatchConfig,
+        "knockout.json": KnockoutConfig,
+        "knockout_ef.json": KnockoutEFConfig,
+        "knockout_final.json": KnockoutFinalConfig,
+    }[filename]
     try:
         raw = json.loads(payload)
     except json.JSONDecodeError as exc:

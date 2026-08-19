@@ -15,6 +15,15 @@ def judge_1v1(left_ex: int, right_ex: int, points: int) -> tuple[int, int]:
     return 0, 0
 
 
+def judge_1v1_bp(left_bp: int, right_bp: int, points: int) -> tuple[int, int]:
+    """1v1 BP 局：miss count（BP）少者得 `points` 分。BP 相同为平局，双方均不得分。"""
+    if left_bp < right_bp:
+        return points, 0
+    if right_bp < left_bp:
+        return 0, points
+    return 0, 0
+
+
 def judge_2v2(side_scores: list[tuple[str, int]]) -> tuple[int, int]:
     """2v2：4 人按 EX 分排名 3/2/1/0，按队求和。
 

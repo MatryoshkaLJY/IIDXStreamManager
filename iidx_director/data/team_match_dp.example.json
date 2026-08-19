@@ -1,0 +1,68 @@
+{
+  "playType": "DP",
+  "stageName": "ファイナルステージ",
+  "matchNumber": 2,
+  "leftTeam": {
+    "name": "大8大",
+    "emoji": "🎩",
+    "colors": {"primary": "#c0c0c0", "secondary": "#ffffff"},
+    "players": [
+      "左队1", "左队2", "左队3", "左队4",
+      "左队5", "左队6", "左队7", "左队8",
+      "左队9", "左队10", "左队11", "左队12"
+    ]
+  },
+  "rightTeam": {
+    "name": "RIGHT TEAM",
+    "emoji": "🚀",
+    "colors": {"primary": "#0000ff", "secondary": "#ffffff"},
+    "players": [
+      "右队1", "右队2", "右队3", "右队4",
+      "右队5", "右队6", "右队7", "右队8",
+      "右队9", "右队10", "右队11", "右队12"
+    ]
+  },
+  "grabRounds": 0,
+  "rounds": [
+    {
+      "type": "1v1",
+      "points": 2,
+      "theme": "SCRATCH",
+      "judgeBy": "ex",
+      "games": [
+        {"leftPlayers": ["左队1"], "rightPlayers": ["右队1"]},
+        {"leftPlayers": ["左队1"], "rightPlayers": ["右队1"]}
+      ]
+    },
+    {
+      "type": "1v1",
+      "points": 3,
+      "theme": "BP",
+      "judgeBy": "bp",
+      "games": [
+        {"leftPlayers": ["左队2"], "rightPlayers": ["右队2"]},
+        {"leftPlayers": ["左队2"], "rightPlayers": ["右队2"]}
+      ]
+    },
+    {
+      "type": "1v1",
+      "points": 4,
+      "theme": "CHORD",
+      "judgeBy": "ex",
+      "games": [
+        {"leftPlayers": ["左队3"], "rightPlayers": ["右队3"]},
+        {"leftPlayers": ["左队3"], "rightPlayers": ["右队3"]}
+      ]
+    },
+    {
+      "type": "1v1",
+      "points": 5,
+      "theme": "FREE",
+      "judgeBy": "ex",
+      "games": [
+        {"leftPlayers": ["左队4"], "rightPlayers": ["右队4"]},
+        {"leftPlayers": ["左队4"], "rightPlayers": ["右队4"]}
+      ]
+    }
+  ]
+}

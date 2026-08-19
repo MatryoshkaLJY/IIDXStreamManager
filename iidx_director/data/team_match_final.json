@@ -1,0 +1,260 @@
+{
+  "playType": "SP",
+  "stageName": "ファイナルステージ",
+  "matchNumber": 1,
+  "leftTeam": {
+    "name": "大8大",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#F2370F",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "NEMESIS",
+      "EVIS.",
+      "GAUDAN",
+      "JACKPO",
+      "7sRef",
+      "NO-BMS",
+      "CLOUD",
+      "ShaMa0",
+      "-HP",
+      "FANZHEN",
+      "ANSHI",
+      "6"
+    ]
+  },
+  "rightTeam": {
+    "name": "二游",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1B6EE3",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "Hrism",
+      "Kodak",
+      "THAC",
+      "SASAKA",
+      "nin",
+      "MKRtypB",
+      "FISHY",
+      "TENNIS",
+      "SETU",
+      "DDZ",
+      "DENJIN",
+      "MRCA"
+    ]
+  },
+  "grabRounds": 4,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "LEVEL 8",
+      "games": [
+        {
+          "leftPlayers": ["NEMESIS"],
+          "rightPlayers": ["Hrism"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 9",
+      "games": [
+        {
+          "leftPlayers": ["EVIS."],
+          "rightPlayers": ["Kodak"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 10",
+      "games": [
+        {
+          "leftPlayers": ["GAUDAN"],
+          "rightPlayers": ["THAC"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "LEVEL 11",
+      "games": [
+        {
+          "leftPlayers": ["JACKPO"],
+          "rightPlayers": ["SASAKA"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+          "leftPlayers": ["7sRef"],
+          "rightPlayers": ["nin"]
+        },
+        {
+          "leftPlayers": ["7sRef"],
+          "rightPlayers": ["nin"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SOF-LAN",
+      "games": [
+        {
+          "leftPlayers": ["NO-BMS"],
+          "rightPlayers": ["MKRtypB"]
+        },
+        {
+          "leftPlayers": ["NO-BMS"],
+          "rightPlayers": ["MKRtypB"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+          "leftPlayers": ["CLOUD"],
+          "rightPlayers": ["FISHY"]
+        },
+        {
+          "leftPlayers": ["CLOUD"],
+          "rightPlayers": ["FISHY"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK",
+      "games": [
+        {
+          "leftPlayers": ["ShaMa0"],
+          "rightPlayers": ["TENNIS"]
+        },
+        {
+          "leftPlayers": ["ShaMa0"],
+          "rightPlayers": ["TENNIS"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD",
+      "games": [
+        {
+          "leftPlayers": ["-HP"],
+          "rightPlayers": ["SETU"]
+        },
+        {
+          "leftPlayers": ["-HP"],
+          "rightPlayers": ["SETU"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+          "leftPlayers": ["FANZHEN"],
+          "rightPlayers": ["DDZ"]
+        },
+        {
+          "leftPlayers": ["FANZHEN"],
+          "rightPlayers": ["DDZ"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+          "leftPlayers": ["ANSHI"],
+          "rightPlayers": ["DENJIN"]
+        },
+        {
+          "leftPlayers": ["ANSHI"],
+          "rightPlayers": ["DENJIN"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        },
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        },
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "???",
+      "games": [
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        },
+        {
+          "leftPlayers": ["6"],
+          "rightPlayers": ["MRCA"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    }
+  ]
+}

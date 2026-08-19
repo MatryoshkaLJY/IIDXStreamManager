@@ -1,0 +1,254 @@
+{
+  "playType": "DP",
+  "stageName": "ファイナルステージ",
+  "matchNumber": 1,
+  "leftTeam": {
+    "name": "中5 CLUB",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#F2370F",
+      "secondary": "#ffffff",
+      "accent": null
+    },
+    "players": [
+      "NEPT",
+      "SETU",
+      "TENNIS",
+      "7sref",
+      "CLOUD",
+      "ALEXX",
+      "HL",
+      "SIII"
+    ]
+  },
+  "rightTeam": {
+    "name": "中4 CLUB",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1B6EE3",
+      "secondary": "#ffffff",
+      "accent": null
+    },
+    "players": [
+      "1noharaP",
+      "S9RYNE",
+      "NEMESIS",
+      "Zzu.",
+      "W",
+      "YT",
+      "P3",
+      "T"
+    ]
+  },
+  "grabRounds": 0,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "NOTES",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "NEPT"
+          ],
+          "rightPlayers": [
+            "1noharaP"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "NEPT"
+          ],
+          "rightPlayers": [
+            "1noharaP"
+          ]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "SETU"
+          ],
+          "rightPlayers": [
+            "S9RYNE"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "SETU"
+          ],
+          "rightPlayers": [
+            "S9RYNE"
+          ]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "TENNIS"
+          ],
+          "rightPlayers": [
+            "NEMESIS"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "TENNIS"
+          ],
+          "rightPlayers": [
+            "NEMESIS"
+          ]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "7sref"
+          ],
+          "rightPlayers": [
+            "Zzu."
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "7sref"
+          ],
+          "rightPlayers": [
+            "Zzu."
+          ]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "CLOUD"
+          ],
+          "rightPlayers": [
+            "W"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "CLOUD"
+          ],
+          "rightPlayers": [
+            "W"
+          ]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "ALEXX"
+          ],
+          "rightPlayers": [
+            "YT"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "ALEXX"
+          ],
+          "rightPlayers": [
+            "YT"
+          ]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "bp"
+    },
+    {
+      "type": "1v1",
+      "theme": "SOFLAN",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "HL"
+          ],
+          "rightPlayers": [
+            "P3"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "HL"
+          ],
+          "rightPlayers": [
+            "P3"
+          ]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": [
+            "SIII"
+          ],
+          "rightPlayers": [
+            "T"
+          ]
+        },
+        {
+          "theme": "",
+          "leftPlayers": [
+            "SIII"
+          ],
+          "rightPlayers": [
+            "T"
+          ]
+        }
+      ],
+      "points": 6,
+      "judgeBy": "ex"
+    }
+  ]
+}

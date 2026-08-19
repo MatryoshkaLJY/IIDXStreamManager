@@ -23,6 +23,7 @@
     const phase = snap.session ? snap.session.phase : 'IDLE';
     setBadge('badge-phase', PHASE_LABELS[phase] || phase, phase !== 'IDLE');
     renderSceneActions(snap);
+    renderAudioActions(snap);
     renderPending(snap.pending);
   }
 
@@ -48,9 +49,10 @@
 
   const SCENE_LABELS = {
     live: '现场',
-    team_sp_1v1: 'SP 团队 1V1', team_sp_2v2: 'SP 团队 2V2',
-    team_dp_1v1: 'DP 团队 1V1', team_dp_2v2: 'DP 团队 2V2',
+    team_sp_1v1: 'SP 团队 1V1', team_sp_2v2: 'SP 个人赛',
+    team_dp_1v1: 'DP 团队 1V1', team_dp_2v2: 'DP 个人赛',
     individual_sp: 'SP 个人赛', individual_dp: 'DP 个人赛',
+    grid: 'Grid',
     scoreboard: '计分板',
   };
 
@@ -77,9 +79,39 @@
     if (button) button.disabled = true;
     try {
       const resp = await window.postJSON('/api/obs/switch', { scene });
-      if (resp.success) window.toast(`已创建待应用场景：${button ? button.textContent : '目标场景'}`);
+      if (resp.success) window.toast(`已切换场景：${button ? button.textContent : '目标场景'}`);
     } finally {
       if (button) button.disabled = !window.lastSnapshot || !window.lastSnapshot.obs_connected;
+    }
+  }
+
+  function renderAudioActions(snap) {
+    const area = document.getElementById('audio-actions');
+    if (!area) return;
+    area.innerHTML = '';
+    const audio = snap.serial_audio || {};
+    const ready = !!(audio.enabled && audio.port);
+    for (let n = 1; n <= 4; n++) {
+      const button = document.createElement('button');
+      button.className = 'scene-button audio-button';
+      button.textContent = `音源${n}`;
+      button.title = ready ? `串口 ${audio.port}，切换到 ${n} 号机台音源` : '串口音频切换未启用（见设置页）';
+      button.disabled = !ready;
+      button.onclick = () => switchAudio(n, button);
+      area.appendChild(button);
+    }
+  }
+
+  async function switchAudio(number, button) {
+    if (button) button.disabled = true;
+    try {
+      const resp = await window.postJSON('/api/serial-audio/switch', { number });
+      if (resp.success) window.toast(`已切换音源：${number} 号机台`);
+    } finally {
+      if (button) {
+        const audio = (window.lastSnapshot || {}).serial_audio || {};
+        button.disabled = !(audio.enabled && audio.port);
+      }
     }
   }
 
@@ -90,6 +122,9 @@
   });
   socket.on('cabinet_update', (data) => {
     if (window.onCabinetUpdate) window.onCabinetUpdate(data);
+  });
+  socket.on('notice', (data) => {
+    if (data && data.message) window.toast(data.message, !!data.is_error);
   });
 
   window.toast = function (msg, isError) {

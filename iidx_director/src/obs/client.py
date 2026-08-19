@@ -7,10 +7,13 @@
 from __future__ import annotations
 
 import re
+import logging
 from collections.abc import Mapping
 from typing import Any
 
 import obsws_python
+
+logger = logging.getLogger(__name__)
 
 
 class OBSClient:
@@ -56,10 +59,11 @@ class OBSClient:
         play_type: str,
         assignments: Mapping[str, Mapping[str, str]],
         team_by_player: Mapping[str, str] | None = None,
+        individual: bool = False,
     ) -> None:
         """Apply the OBS source visibility layout for a confirmed round."""
         if scene == "SP_Arena":
-            self._apply_sp_arena(assignments)
+            self._apply_sp_arena(assignments, individual=individual)
         elif scene == "DP_Arena":
             self._apply_dp_arena()
         elif scene == "SP_BPL":
@@ -67,7 +71,12 @@ class OBSClient:
         elif scene == "DP_BPL":
             self._apply_dp_bpl(assignments, team_by_player or {})
 
-    def _apply_sp_arena(self, assignments: Mapping[str, Mapping[str, str]]) -> None:
+    def _apply_sp_arena(
+        self,
+        assignments: Mapping[str, Mapping[str, str]],
+        *,
+        individual: bool = False,
+    ) -> None:
         active: set[tuple[int, str]] = set()
         for slot in assignments.values():
             active.add((self._machine_number(slot["machine"]), self._side_name(slot["side"])))
@@ -78,8 +87,15 @@ class OBSClient:
                     "SP_Arena", f"SP_C{machine}_{side}", (machine, side) in active
                 )
 
+        # 个人赛中 MIDUI / SongName / BPM 只展示 1 号机台玩家所在侧的信息
+        machine_one_side = next(
+            (item_side for machine, item_side in active if machine == 1), None
+        )
         for side in ("1P", "2P"):
-            used = any(item_side == side for _, item_side in active)
+            if individual and machine_one_side is not None:
+                used = side == machine_one_side
+            else:
+                used = any(item_side == side for _, item_side in active)
             for group in (
                 f"SP_MIDUI_{side}",
                 f"SP_{side}_SongName",
@@ -189,7 +205,7 @@ class OBSClient:
         group_enabled: bool = True,
     ) -> None:
         self._set_group_enabled(scene, group, group_enabled)
-        response = self._send("GetGroupSceneItemList", {"sceneName": group})
+        response = self._send_response("GetGroupSceneItemList", {"sceneName": group})
         items = response.get("sceneItems")
         if not isinstance(items, list):
             raise RuntimeError(f"OBS 组 {group} 返回了无效元素列表")
@@ -210,7 +226,7 @@ class OBSClient:
             )
 
     def _find_scene_item(self, scene: str, source_name: str) -> dict[str, Any]:
-        response = self._send("GetSceneItemList", {"sceneName": scene})
+        response = self._send_response("GetSceneItemList", {"sceneName": scene})
         items = response.get("sceneItems")
         if not isinstance(items, list):
             raise RuntimeError(f"OBS 场景 {scene} 返回了无效元素列表")
@@ -229,11 +245,21 @@ class OBSClient:
             {"sceneName": scene, "sceneItemId": numeric_id, "sceneItemEnabled": bool(enabled)},
         )
 
-    def _send(self, request: str, data: dict[str, Any]) -> dict[str, Any]:
+    def _send(self, request: str, data: dict[str, Any]) -> dict[str, Any] | None:
         self._require()
-        response = self._client.send(request, data, raw=True)  # type: ignore[union-attr]
-        if not isinstance(response, dict):
-            raise RuntimeError(f"OBS {request} 返回了无效响应")
+        try:
+            response = self._client.send(request, data, raw=True)  # type: ignore[union-attr]
+        except Exception as exc:
+            raise RuntimeError(f"OBS 请求 {request} 失败，参数={data}: {exc}") from exc
+        logger.debug("OBS 请求 %s 参数=%r 响应=%r", request, data, response)
+        if response is not None and not isinstance(response, dict):
+            raise RuntimeError(f"OBS 请求 {request} 返回了无效响应，参数={data}，响应={response!r}")
+        return response
+
+    def _send_response(self, request: str, data: dict[str, Any]) -> dict[str, Any]:
+        response = self._send(request, data)
+        if response is None:
+            raise RuntimeError(f"OBS 请求 {request} 返回空响应，参数={data}")
         return response
 
     def _require(self) -> None:

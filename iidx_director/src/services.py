@@ -68,23 +68,11 @@ def _service_ready(spec: ServiceSpec) -> bool:
 
 def default_service_specs(monorepo_root: Path) -> tuple[ServiceSpec, ...]:
     """返回当前 monorepo 布局下的默认基础服务。"""
-    state_root = monorepo_root / "iidx_state_reco"
+    # 状态识别服务（9876）已随状态识别模型一起弃用，不再自动启动；
+    # iidx_state_reco/ 代码与模型文件保留备用。
     score_root = monorepo_root / "iidx_score_reco"
     director_root = monorepo_root / "iidx_director"
     return (
-        ServiceSpec(
-            "state-reco",
-            (
-                sys.executable,
-                str(state_root / "serve.py"),
-                "--model",
-                str(state_root / "classifier.onnx"),
-                "--tcp",
-                "9876",
-            ),
-            state_root,
-            9876,
-        ),
         ServiceSpec(
             "score-reco",
             (
@@ -176,10 +164,14 @@ class DependencyManager:
                 "stderr": None,
             }
             if os.name == "nt":
-                # Keep children in a group so stop() can terminate only our tree.
+                # Give each managed service its own console so startup/runtime
+                # errors remain visible while the director UI runs separately.
+                startupinfo = subprocess.STARTUPINFO()
+                startupinfo.lpTitle = f"IIDX Director - {spec.name}"
+                popen_kwargs["startupinfo"] = startupinfo
                 popen_kwargs["creationflags"] = getattr(
                     subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200
-                )
+                ) | getattr(subprocess, "CREATE_NEW_CONSOLE", 0x00000010)
             else:
                 popen_kwargs["start_new_session"] = True
             process = subprocess.Popen(
@@ -201,7 +193,7 @@ class DependencyManager:
             if returncode is not None:
                 hint = "请检查端口占用、模型文件和 Python 依赖。"
                 if spec.name == "state-reco":
-                    hint = "请确认 classifier.onnx、classifier.onnx.data 和 classifier.labels.txt 均存在。"
+                    hint = "请确认 classifier_augmented_medium.onnx、classifier_augmented_medium.onnx.data 和 classifier_augmented_medium.labels.txt 均存在。"
                 elif spec.name == "score-reco":
                     hint = "请确认 font/ 和 rois.csv 存在且 OpenCV/Pillow 已安装。"
                 raise ServiceStartupError(

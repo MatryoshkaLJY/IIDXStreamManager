@@ -15,6 +15,8 @@
  *       "colors": { "primary": "#c0c0c0", "secondary": "#ffffff" }
  *     },
  *     "rightTeam": { ... },
+ *     "initialLeftScore": 2,     // 可选：抢夺赛初始 PT，计入总分
+ *     "initialRightScore": 1,    // 可选：缺省按 0 处理
  *     "matches": [
  *       {
  *         "type": "1v1",           // or "2v2"
@@ -53,9 +55,10 @@ class ScoreboardApp {
         this.config = null;
         this.ws = null;
         this.reconnectInterval = 3000;
-        this.wsUrl = 'ws://localhost:8080';
+        this.wsUrl = `ws://${location.hostname || '127.0.0.1'}:8080`;
         this.matchData = []; // Store match configurations
         this.scores = [];    // Store current scores
+        this.initialScores = { left: 0, right: 0 }; // 抢夺赛初始 PT（init 携带）
         this.revealedMatches = new Set(); // Tracks which matches have revealed players
 
         // DOM elements
@@ -221,11 +224,18 @@ class ScoreboardApp {
         this.matchData = data.matches || [];
         this.revealedMatches.clear();
 
+        // 抢夺赛初始 PT（无该字段时按 0 处理，兼容旧协议）
+        this.initialScores = {
+            left: data.initialLeftScore ?? 0,
+            right: data.initialRightScore ?? 0
+        };
+
         // Initialize scores
         this.scores = this.matchData.map(() => ({ left: null, right: null }));
 
         // Render match rows
         this.renderMatchRows();
+        this.updateTotalScores();
 
         this.logMessage(`Match initialized: ${this.matchData.length} rounds`, 'init');
     }
@@ -270,6 +280,7 @@ class ScoreboardApp {
      */
     handleReset() {
         this.scores = this.matchData.map(() => ({ left: null, right: null }));
+        this.initialScores = { left: 0, right: 0 };
         this.revealedMatches.clear();
 
         // Reset UI
@@ -379,8 +390,8 @@ class ScoreboardApp {
 
         if (type === '2v2' && players.length === 2) {
             return `
-                <span class="player-name">${players[0]}</span>
-                <span class="player-name">${players[1]}</span>
+                <span class="player-name player-name-2v2">${players[0]}</span>
+                <span class="player-name player-name-2v2">${players[1]}</span>
             `;
         }
 
@@ -423,8 +434,8 @@ class ScoreboardApp {
     }
 
     updateTotalScores() {
-        let leftTotal = 0;
-        let rightTotal = 0;
+        let leftTotal = this.initialScores.left;
+        let rightTotal = this.initialScores.right;
 
         this.scores.forEach(score => {
             if (score.left !== null) leftTotal += score.left;

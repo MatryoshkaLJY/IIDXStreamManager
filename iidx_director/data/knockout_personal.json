@@ -1,0 +1,30 @@
+{
+  "playType": "SP",
+  "tournamentName": "个人赛",
+  "groups": {
+    "A": [
+      "AAtoZZ",
+      "ANSHI",
+      "DENJIN",
+      "S9ryne"
+    ],
+    "C": [
+      "MM",
+      "MIMOE",
+      "DDZ",
+      "TENNIS"
+    ],
+    "D": [
+      "P3",
+      "CN.Lyy",
+      "29",
+      "KYOSAK"
+    ],
+    "B": [
+      "AOKI.S",
+      "LION",
+      "ShaMa0",
+      "SETU"
+    ]
+  }
+}

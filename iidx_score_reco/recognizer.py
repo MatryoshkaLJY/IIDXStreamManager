@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import tempfile
 from pathlib import Path
 from typing import List, Tuple, Optional, Dict
 
@@ -179,7 +180,7 @@ class IIDXDigitRecognizer:
         binary = self._extract_digit_mask(img)
 
         if debug:
-            cv2.imwrite('/tmp/debug_binary.png', binary)
+            cv2.imwrite(str(Path(tempfile.gettempdir()) / 'iidx_debug_binary.png'), binary)
             print(f"二值图非零像素: {np.count_nonzero(binary)}")
 
         # 分割数字
@@ -216,6 +217,24 @@ class IIDXDigitRecognizer:
         img = cv2.imread(image_path, cv2.IMREAD_COLOR)
         if img is None:
             raise ValueError(f"无法读取图片: {image_path}")
+        return self.recognize_all_rois_array(img, rois, debug=debug)
+
+    def recognize_all_rois_array(self, img: np.ndarray,
+                                 rois: List[Tuple[str, int, int, int, int]],
+                                 debug: bool = False) -> Dict[str, str]:
+        """
+        识别多个ROI区域的数字（内存版，避免临时文件与重复解码）
+
+        Args:
+            img: BGR 图像数组
+            rois: ROI列表，每个ROI为 (name, x1, y1, x2, y2)
+            debug: 是否输出调试信息
+
+        Returns:
+            字典，键为ROI名称，值为识别结果
+        """
+        if img is None or img.size == 0:
+            raise ValueError("图像数据为空")
 
         results = {}
         for roi in rois:
@@ -229,7 +248,7 @@ class IIDXDigitRecognizer:
             binary = self._extract_digit_mask(roi_img)
 
             if debug:
-                cv2.imwrite(f'/tmp/debug_{name}_binary.png', binary)
+                cv2.imwrite(str(Path(tempfile.gettempdir()) / f'iidx_debug_{name}_binary.png'), binary)
 
             # 分割数字
             digits = self._segment_digits(binary)

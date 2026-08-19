@@ -18,6 +18,8 @@
   <div class="row">
     <label><input type="radio" name="mode" value="team"> 团队赛（BPL 记分板 :8080）</label>
     <label><input type="radio" name="mode" value="knockout"> 个人淘汰赛（记分板 :8081）</label>
+    <label><input type="radio" name="mode" value="knockout_ef"> 个人淘汰赛 EF 组起（记分板 :8081）</label>
+    <label><input type="radio" name="mode" value="knockout_final"> 个人淘汰赛 直接决赛（记分板 :8081）</label>
     <button onclick="saveMode()">保存</button>
   </div>
 </div>
@@ -35,6 +37,18 @@
     <button onclick="uploadConfig('knockout')">上传</button>
     <button class="secondary" onclick="downloadTemplate('knockout')">下载模板</button>
     <button class="secondary" onclick="viewConfig('knockout')">查看当前</button>
+  </div>
+  <div class="row">
+    <label>淘汰赛 EF 组起 knockout_ef.json <input type="file" id="file-knockout_ef" accept=".json"></label>
+    <button onclick="uploadConfig('knockout_ef')">上传</button>
+    <button class="secondary" onclick="downloadTemplate('knockout_ef')">下载模板</button>
+    <button class="secondary" onclick="viewConfig('knockout_ef')">查看当前</button>
+  </div>
+  <div class="row">
+    <label>淘汰赛直接决赛 knockout_final.json <input type="file" id="file-knockout_final" accept=".json"></label>
+    <button onclick="uploadConfig('knockout_final')">上传</button>
+    <button class="secondary" onclick="downloadTemplate('knockout_final')">下载模板</button>
+    <button class="secondary" onclick="viewConfig('knockout_final')">查看当前</button>
   </div>
   <pre id="config-view" class="hint" style="max-height:260px;overflow:auto"></pre>
 </div>
@@ -57,7 +71,20 @@
     <button onclick="postJSON('/api/monitor', {action:'start'})">启动监控</button>
     <button class="secondary" onclick="postJSON('/api/monitor', {action:'stop'})">停止监控</button>
   </div>
-  <div class="hint">监控轮询 4 台机台画面，状态机触发抓分后自动带入当前回合。导播台启动时会自动准备识别服务。</div>
+  <div class="hint">连接各机台 OBS 画面源，供比赛页面手动抓分使用。导播台启动时会自动准备分数识别服务。</div>
+</div>
+
+<div class="card">
+  <h2>串口音频切换</h2>
+  <div class="row">
+    <label><input type="checkbox" id="serial-enabled"> 团队赛1V1自动切换</label>
+    <select id="serial-port" style="min-width:120px"><option value="">（选择串口）</option></select>
+    <label>波特率 <input id="serial-baudrate" value="9600" style="width:70px"></label>
+    <button onclick="saveSerialAudio()">保存</button>
+    <button class="secondary" onclick="refreshSerialPorts()">刷新串口</button>
+    <span id="serial-status" class="hint" style="margin-left:8px"></span>
+  </div>
+  <div class="hint">启用后，团队赛1V1回合开始时会自动把音频输入源切到左队选手使用的机台编号（1-4）。串口设备需接收对应数字 ASCII 字符。</div>
 </div>
 
 <div class="card">
@@ -75,12 +102,54 @@ window.onSessionUpdate = function (snap) {
   const testMode = document.getElementById('test-mode');
   testMode.checked = !!snap.test_mode;
   testMode.disabled = !!snap.session && snap.session.phase !== 'IDLE';
+  const sa = snap.serial_audio || {};
+  document.getElementById('serial-enabled').checked = !!sa.enabled;
+  const portSelect = document.getElementById('serial-port');
+  if (sa.port && !Array.from(portSelect.options).some(o => o.value === sa.port)) {
+    portSelect.add(new Option(sa.port, sa.port));
+  }
+  portSelect.value = sa.port || '';
+  document.getElementById('serial-baudrate').value = sa.baudrate || 9600;
 };
 
 async function toggleTestMode(input) {
   const resp = await postJSON('/api/test-mode', { enabled: input.checked });
   if (!resp.success) input.checked = !input.checked;
 }
+
+async function refreshSerialPorts() {
+  const resp = await fetch('/api/serial-audio/ports');
+  const data = await resp.json();
+  const select = document.getElementById('serial-port');
+  const status = document.getElementById('serial-status');
+  const current = select.value;
+  const ports = data.ports || [];
+  select.innerHTML = '<option value="">（选择串口）</option>' +
+    ports.map(p => `<option value="${esc(p)}" ${p === current ? 'selected' : ''}>${esc(p)}</option>`).join('');
+  if (current && !ports.includes(current)) {
+    select.add(new Option(current, current, true, true));
+  }
+  if (!data.success) {
+    status.textContent = '读取串口失败';
+    status.style.color = '#ff6b6b';
+  } else if (ports.length === 0) {
+    status.textContent = '未检测到串口，请检查驱动或 pyserial 是否安装';
+    status.style.color = '#ff6b6b';
+  } else {
+    status.textContent = `检测到 ${ports.length} 个串口`;
+    status.style.color = '';
+  }
+}
+
+async function saveSerialAudio() {
+  await postJSON('/api/serial-audio', {
+    enabled: document.getElementById('serial-enabled').checked,
+    port: document.getElementById('serial-port').value || null,
+    baudrate: parseInt(document.getElementById('serial-baudrate').value) || 9600,
+  });
+}
+
+refreshSerialPorts();
 
 async function obsConnect() {
   await postJSON('/api/obs/connect', {
@@ -109,7 +178,7 @@ async function downloadTemplate(kind) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = kind === 'team' ? 'team_match.json' : 'knockout.json';
+  a.download = { team: 'team_match.json', knockout: 'knockout.json', knockout_ef: 'knockout_ef.json', knockout_final: 'knockout_final.json' }[kind] || 'config.json';
   a.click();
 }
 

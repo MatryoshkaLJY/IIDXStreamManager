@@ -52,7 +52,7 @@ class TournamentApp {
     constructor() {
         this.ws = null;
         this.reconnectInterval = 3000;
-        this.wsUrl = 'ws://localhost:8081';
+        this.wsUrl = `ws://${location.hostname || '127.0.0.1'}:8081`;
 
         // Tournament state
         this.tournamentState = {
@@ -251,21 +251,89 @@ class TournamentApp {
             }
         }
 
-        // Initialize empty semifinal groups (E, F)
-        this.tournamentState.groups.E.players = [];
-        this.tournamentState.groups.F.players = [];
+        // 起始阶段赛制：init 载荷带 startGroup（'E' = 8 人 EF 组起，'finals' = 4 人直接决赛）
+        const startGroup = data.startGroup || null;
+        const efOnly = startGroup === 'E';
+        const finalOnly = startGroup === 'finals';
+        const container = document.querySelector('.tournament-container');
+        if (efOnly) {
+            for (const groupName of ['E', 'F']) {
+                const playerNames = data.groups[groupName];
+                if (playerNames && Array.isArray(playerNames) && playerNames.length === 4) {
+                    this.tournamentState.groups[groupName].players = playerNames.map((name, index) => ({
+                        name: name,
+                        position: index,
+                        rawScores: [null, null, null, null],
+                        points: 0,
+                        totalRawScore: 0
+                    }));
 
-        // Initialize empty finals
-        this.tournamentState.finals.players = [];
+                    playerNames.forEach((name, position) => {
+                        this.updatePlayerNode(groupName, position, {
+                            name: name,
+                            score: 0,
+                            points: 0,
+                            rank: '-'
+                        });
+                    });
+                }
+            }
+            // 隐藏 A-D 小组赛区域
+            if (container) container.classList.add('ef-only');
+        } else {
+            // Initialize empty semifinal groups (E, F)
+            this.tournamentState.groups.E.players = [];
+            this.tournamentState.groups.F.players = [];
+        }
+
+        // Initialize finals
+        if (finalOnly) {
+            const finalistNames = data.groups['finals'];
+            if (finalistNames && Array.isArray(finalistNames) && finalistNames.length === 4) {
+                this.tournamentState.finals.players = finalistNames.map((name, index) => ({
+                    name: name,
+                    position: index,
+                    rawScores: [null, null, null, null],
+                    points: 0,
+                    totalRawScore: 0,
+                    tiebreakerScore: 0
+                }));
+
+                finalistNames.forEach((name, position) => {
+                    this.updatePlayerNode('finals', position, {
+                        name: name,
+                        score: 0,
+                        points: 0,
+                        rank: '-'
+                    });
+                });
+            }
+            // 隐藏 A-F 前置阶段区域
+            if (container) container.classList.add('final-only');
+        } else {
+            this.tournamentState.finals.players = [];
+        }
         this.tournamentState.finals.inTiebreaker = false;
 
         // Clear any existing path lighting
         this.clearAllPaths();
 
-        this.tournamentState.currentStage = 'quarterfinal';
-        this.tournamentState.currentActiveGroup = 'A';
-        this.highlightGroup('A');
-        this.updateStageIndicator('A');
+        if (efOnly) {
+            this.tournamentState.currentStage = 'semifinal';
+            this.tournamentState.currentActiveGroup = 'E';
+            this.highlightGroup('E');
+            this.updateStageIndicator('E');
+        } else if (finalOnly) {
+            this.tournamentState.currentStage = 'final';
+            this.tournamentState.currentActiveGroup = 'finals';
+            this.highlightGroup('finals');
+            this.updateStageIndicator('finals');
+        } else {
+            this.tournamentState.currentStage = 'quarterfinal';
+            this.tournamentState.currentActiveGroup = 'A';
+            this.highlightGroup('A');
+            this.updateStageIndicator('A');
+        }
         console.log('Tournament initialized:', this.tournamentState);
     }
 
@@ -286,9 +354,9 @@ class TournamentApp {
             return;
         }
 
-        // Validate round is 1-4
-        if (round < 1 || round > 4) {
-            console.error('SCORE command: round must be 1-4');
+        // Validate round（常规局 1-4，加赛局从 5 开始递增）
+        if (round < 1) {
+            console.error('SCORE command: round must be >= 1');
             return;
         }
 
@@ -311,12 +379,11 @@ class TournamentApp {
             scores
         });
 
-        // Calculate ranks by sorting scores descending
-        const sortedScores = [...scores].sort((a, b) => b.score - a.score);
+        // Calculate ranks with competition ranking（同分同名次：并列第一均为第 1 名）
         const ranks = new Map();
-        sortedScores.forEach((s, index) => {
-            ranks.set(s.player, index + 1); // 1st, 2nd, 3rd, 4th
-        });
+        for (const s of scores) {
+            ranks.set(s.player, 1 + scores.filter(o => o.score > s.score).length);
+        }
 
         // Update each player's data
         for (const scoreData of scores) {
@@ -328,38 +395,29 @@ class TournamentApp {
             // Find player in group
             const player = groupState.players.find(p => p && p.name === playerName);
             if (player) {
-                // Store raw score for this round (round is 1-indexed, array is 0-indexed)
-                player.rawScores[round - 1] = rawScore;
-
-                if (stage === 'final') {
-                    const finalsState = this.tournamentState.finals;
-                    if (finalsState.inTiebreaker) {
-                        // Tiebreaker: accumulate tiebreaker score, no points awarded
-                        player.tiebreakerScore = (player.tiebreakerScore || 0) + rawScore;
-                    } else {
-                        // Finals normal round: accumulate total raw score like other stages
-                        player.totalRawScore = (player.totalRawScore || 0) + rawScore;
-                        // Add points for this round
-                        player.points += points;
-                    }
+                if (groupState.inTiebreaker) {
+                    // 加赛局：只累计加赛分，不影响常规局数据
+                    player.tiebreakerScore = (player.tiebreakerScore || 0) + rawScore;
                 } else {
-                    // A-F groups: accumulate total raw score
-                    player.totalRawScore = player.rawScores.reduce((sum, s) => sum + (s || 0), 0);
+                    // Store raw score for this round (round is 1-indexed, array is 0-indexed)
+                    player.rawScores[round - 1] = rawScore;
+                    player.totalRawScore = (player.totalRawScore || 0) + rawScore;
                     // Add points for this round
                     player.points += points;
                 }
 
-                // Update DOM
+                // Update DOM（加赛期间显示加赛累计分）
                 this.updatePlayerNode(group, player.position, {
-                    score: player.totalRawScore,
+                    score: groupState.inTiebreaker ? player.tiebreakerScore : player.totalRawScore,
                     points: player.points,
                     rank: rank
                 });
             }
         }
 
-        // Auto-settle after 4 rounds for non-final groups
-        if (stage !== 'final' && groupState.scores.length === 4 && !groupState.settled) {
+        // Auto-settle after 4 rounds for non-final groups（加赛期间每次收到分数都重新结算）
+        if (stage !== 'final' && !groupState.settled &&
+            (groupState.scores.length === 4 || groupState.inTiebreaker)) {
             this.handleSettle({ stage, group });
         }
     }
@@ -394,20 +452,23 @@ class TournamentApp {
             return;
         }
 
-        groupState.settled = true;
+        // 加赛结算：各并列组内按加赛分定名次，仍平分的子组继续加赛（非决赛末位并列除外）
+        if (groupState.inTiebreaker) {
+            if (this.resolveTiebreaker(groupState, stage)) {
+                console.log(`🏁 ${stage} Group ${group} still tied, playoff continues.`);
+                return;
+            }
+            groupState.inTiebreaker = false;
+            groupState.tieGroups = null;
+        }
 
         // Sort players based on stage rules
         let sortedPlayers;
         if (stage === 'final') {
-            if (groupState.inTiebreaker) {
-                sortedPlayers = [...groupState.players].sort((a, b) => {
-                    return (b.tiebreakerScore || 0) - (a.tiebreakerScore || 0);
-                });
-            } else {
-                sortedPlayers = [...groupState.players].sort((a, b) => {
-                    return b.points - a.points;
-                });
-            }
+            // 决赛：只按 PT 排名
+            sortedPlayers = [...groupState.players].sort((a, b) => {
+                return b.points - a.points;
+            });
         } else {
             // A-F groups: sort by PT then totalRawScore
             sortedPlayers = [...groupState.players].sort((a, b) => {
@@ -417,6 +478,33 @@ class TournamentApp {
                 return b.totalRawScore - a.totalRawScore; // Higher raw score as tiebreaker
             });
         }
+
+        // 首次结算：检测并列组（决赛看 PT；A-F 看 PT + 总 EX），有则进入加赛。
+        // 非决赛只需决出前两名：不跨越出线线（第 2/3 名之间）的并列不加赛——
+        // 头名并列（都出线）与第 3 名及以后的并列（都淘汰）均按当前排序落位
+        if (!groupState.tiebreakPlacement) {
+            const tieGroups = stage === 'final'
+                ? this.findTieGroups(sortedPlayers, p => p.points)
+                : this.findTieGroups(sortedPlayers, p => `${p.points}|${p.totalRawScore}`)
+                      .filter(tg => tg.startRank < 2 && tg.startRank + tg.players.length > 2);
+            if (tieGroups.length > 0) {
+                groupState.inTiebreaker = true;
+                groupState.tieGroups = tieGroups;
+                for (const tg of tieGroups) {
+                    // 并列选手保持 active，等待加赛
+                    for (const pos of tg.players) {
+                        this.setPlayerState(stage === 'final' ? 'finals' : group, pos, 'active');
+                    }
+                }
+                console.log(`🏁 ${stage} Group ${group} tied! Entering tiebreaker for tied players.`);
+                return;
+            }
+        } else {
+            // 应用加赛结果：替换各并列区间的位置
+            sortedPlayers = sortedPlayers.map((p, i) => groupState.tiebreakPlacement[i] || p);
+        }
+
+        groupState.settled = true;
 
         if (stage !== 'final') {
             // Top 2 advance, bottom 2 eliminated
@@ -499,76 +587,86 @@ class TournamentApp {
                 }
             }
         } else {
-            // stage === 'final'
+            // stage === 'final'：名次全部决出（含加赛结果），发放奖牌
             const medals = ['🥇', '🥈', '🥉', ''];
-
-            if (!groupState.inTiebreaker) {
-                // Check for PT ties and group them
-                const tieGroups = [];
-                let i = 0;
-                let hasTie = false;
-
-                while (i < sortedPlayers.length) {
-                    let j = i + 1;
-                    while (j < sortedPlayers.length && sortedPlayers[j].points === sortedPlayers[i].points) {
-                        j++;
-                    }
-                    const group = sortedPlayers.slice(i, j);
-                    if (group.length > 1) {
-                        hasTie = true;
-                        tieGroups.push({ startRank: i, players: group.map(p => p.position) });
-                        // Tie players stay active for tiebreaker
-                        for (const p of group) {
-                            this.setPlayerState('finals', p.position, 'active');
-                        }
-                    } else {
-                        // No tie - assign medal immediately
-                        const player = group[0];
-                        const node = this.getPlayerNode('finals', player.position);
-                        if (node) {
-                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'silver', 'bronze');
-                            if (i === 0) node.classList.add('champion');
-                            else if (i === 1) node.classList.add('silver');
-                            else if (i === 2) node.classList.add('bronze');
-                            const pointsEl = node.querySelector('.player-points');
-                            if (pointsEl) pointsEl.textContent = medals[i] || '';
-                        }
-                    }
-                    i = j;
+            sortedPlayers.forEach((player, i) => {
+                const node = this.getPlayerNode('finals', player.position);
+                if (node) {
+                    node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'silver', 'bronze');
+                    if (i === 0) node.classList.add('champion');
+                    else if (i === 1) node.classList.add('silver');
+                    else if (i === 2) node.classList.add('bronze');
+                    const pointsEl = node.querySelector('.player-points');
+                    if (pointsEl) pointsEl.textContent = medals[i] || '';
                 }
+            });
+        }
+    }
 
-                if (hasTie) {
-                    groupState.inTiebreaker = true;
-                    groupState.tieGroups = tieGroups;
-                    console.log('🏁 Finals tied! Entering tiebreaker for tied players.');
-                    return;
-                }
-            } else {
-                // In tiebreaker - resolve within each tie group
-                for (const tg of groupState.tieGroups) {
-                    const groupPlayers = tg.players
-                        .map(pos => groupState.players.find(p => p.position === pos))
-                        .filter(p => p);
-                    groupPlayers.sort((a, b) => (b.tiebreakerScore || 0) - (a.tiebreakerScore || 0));
+    /**
+     * Find tied groups in sorted players（key 相同的相邻选手为一组）
+     * @param {Array} sortedPlayers - 已排序的选手数组
+     * @param {Function} keyFn - 并列判定键
+     * @returns {Array} [{startRank, players: [position, ...]}]
+     */
+    findTieGroups(sortedPlayers, keyFn) {
+        const groups = [];
+        let i = 0;
+        while (i < sortedPlayers.length) {
+            let j = i + 1;
+            while (j < sortedPlayers.length && keyFn(sortedPlayers[j]) === keyFn(sortedPlayers[i])) {
+                j++;
+            }
+            if (j - i > 1) {
+                groups.push({ startRank: i, players: sortedPlayers.slice(i, j).map(p => p.position) });
+            }
+            i = j;
+        }
+        return groups;
+    }
 
-                    for (let k = 0; k < groupPlayers.length; k++) {
-                        const player = groupPlayers[k];
-                        const rank = tg.startRank + k;
-                        const node = this.getPlayerNode('finals', player.position);
-                        if (node) {
-                            node.classList.remove('active', 'eliminated', 'advancing', 'champion', 'silver', 'bronze');
-                            if (rank === 0) node.classList.add('champion');
-                            else if (rank === 1) node.classList.add('silver');
-                            else if (rank === 2) node.classList.add('bronze');
-                            const pointsEl = node.querySelector('.player-points');
-                            if (pointsEl) pointsEl.textContent = medals[rank] || '';
-                        }
-                    }
+    /**
+     * 加赛结算：各并列组内按加赛分排序，仍平分的子组保留为未决组。
+     * 已决出的位置写入 groupState.tiebreakPlacement（名次下标 -> 选手）。
+     * 非决赛只需决出前两名：不跨越出线线（第 2/3 名之间）的并列子组按加赛分顺序落位，不再加赛。
+     * @param {Object} groupState - 组状态（需含 tieGroups / players）
+     * @param {string} stage - 阶段（quarterfinal / semifinal / final）
+     * @returns {boolean} true 表示仍有未决并列，需要继续加赛
+     */
+    resolveTiebreaker(groupState, stage) {
+        const pending = [];
+        const placement = groupState.tiebreakPlacement || {};
+        for (const tg of groupState.tieGroups) {
+            const groupPlayers = tg.players
+                .map(pos => groupState.players.find(p => p.position === pos))
+                .filter(p => p);
+            groupPlayers.sort((a, b) => (b.tiebreakerScore || 0) - (a.tiebreakerScore || 0));
+
+            let i = 0;
+            let rank = tg.startRank;
+            while (i < groupPlayers.length) {
+                let j = i + 1;
+                while (j < groupPlayers.length &&
+                       (groupPlayers[j].tiebreakerScore || 0) === (groupPlayers[i].tiebreakerScore || 0)) {
+                    j++;
                 }
-                groupState.inTiebreaker = false;
-                groupState.tieGroups = null;
+                const sub = groupPlayers.slice(i, j);
+                if (sub.length > 1 && (stage === 'final' || (rank < 2 && rank + sub.length > 2))) {
+                    pending.push({ startRank: rank, players: sub.map(p => p.position) });
+                } else {
+                    // 单人或（非决赛）不跨出线线的并列：按当前加赛分顺序落位，不再加赛
+                    sub.forEach((p, k) => { placement[rank + k] = p; });
+                }
+                rank += sub.length;
+                i = j;
             }
         }
+        groupState.tiebreakPlacement = placement;
+        if (pending.length > 0) {
+            groupState.tieGroups = pending;
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -674,6 +772,10 @@ class TournamentApp {
         // Reset tournament name
         const titleTextEl = document.querySelector('.title-text');
         if (titleTextEl) titleTextEl.textContent = '16人淘汰赛';
+
+        // 恢复完整 16 人布局（清除 EF/决赛赛制的区域隐藏）
+        const container = document.querySelector('.tournament-container');
+        if (container) container.classList.remove('ef-only', 'final-only');
 
         // Reset stage indicator
         this.updateStageIndicator('A');

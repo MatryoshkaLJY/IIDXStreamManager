@@ -14,14 +14,14 @@ OBS Manager - 与 OBS Studio 交互的工具类
 示例:
     from obs_manager import OBSManager
 
-    obs = OBSManager(host="localhost", port=4455, password="1145141919")
+    obs = OBSManager(host="127.0.0.1", port=4455, password=None)
     obs.connect()
 
     # 功能1: 抓取并识别游戏状态
     result = obs.capture_and_recognize(
         source_name="video",
         target_size=(224, 224),
-        infer_addr=("127.0.0.1", 9876)  # 或 Unix socket: "/tmp/iidx_infer.sock"
+        infer_addr=("127.0.0.1", 9876)  # Windows 业务端使用 TCP
     )
     print(f"识别结果: {result}")  # 如 "play"
 
@@ -35,8 +35,10 @@ OBS Manager - 与 OBS Studio 交互的工具类
 
 import io
 import json
+import os
 import socket
 import struct
+import time
 from dataclasses import dataclass
 from typing import Union, Tuple, Optional, List, Dict, Any
 from pathlib import Path
@@ -62,6 +64,15 @@ class MachineConfig:
     # Score validation retry state
     pending_score_validation: bool = False
     last_invalid_scores: Optional[dict] = None
+    # 连续 score 帧计数与抓分 pending 状态：
+    # 状态机触发 get_score 后，需连续 SCORE_STREAK_REQUIRED 帧都判定为
+    # score 才真正抓图抓分，避免转场瞬间的单帧误判触发抓分。
+    score_streak: int = 0
+    pending_score_capture: bool = False
+
+
+# 连续多少帧判定为 score 才触发抓图抓分
+SCORE_STREAK_REQUIRED = 3
 
 
 class OBSManager:
@@ -69,7 +80,7 @@ class OBSManager:
 
     def __init__(
         self,
-        host: str = "localhost",
+        host: str = "127.0.0.1",
         port: int = 4455,
         password: Optional[str] = None,
         timeout: int = 5
@@ -92,6 +103,13 @@ class OBSManager:
         # Multi-machine state tracking
         self.machines: Dict[str, MachineConfig] = {}
         self._state_manager: Optional[Any] = None
+        # The exact full-resolution frame used for the latest score OCR.
+        self.last_score_frame: Optional[Image.Image] = None
+        # OBS 返回的原始截图字节（抓分链路为 JPEG），供调用方直接存档，
+        # 避免 PIL 再编码（1080p PNG 默认压缩需 300-400ms）。
+        self.last_score_frame_bytes: Optional[bytes] = None
+        # capture_source 最近一次截图的原始字节
+        self.last_capture_bytes: Optional[bytes] = None
 
     def connect(self) -> None:
         """连接到 OBS WebSocket"""
@@ -179,6 +197,7 @@ class OBSManager:
                 img_data = img_data.split(",", 1)[1]
 
             img_bytes = base64.b64decode(img_data)
+            self.last_capture_bytes = img_bytes
             img = Image.open(io.BytesIO(img_bytes))
 
             # 如果需要特定尺寸但 OBS 没有正确返回
@@ -203,7 +222,7 @@ class OBSManager:
             img: PIL Image 对象
             infer_addr: 推理服务地址
                        - TCP: ("127.0.0.1", 9876)
-                       - Unix socket: "/tmp/iidx_infer.sock"
+                       - Unix socket: Linux 开发模式可用
             image_format: 图像格式
 
         Returns:
@@ -222,7 +241,9 @@ class OBSManager:
 
         # 创建 socket 连接
         if isinstance(infer_addr, str):
-            # Unix socket
+            if os.name == "nt":
+                raise RuntimeError("Windows 部署只支持 TCP 推理服务，请传入 ('127.0.0.1', 9876)")
+            # Unix socket (Linux development mode only)
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.connect(infer_addr)
         else:
@@ -268,7 +289,7 @@ class OBSManager:
             # Unix socket 模式
             result = obs.capture_and_recognize(
                 source_name="video",
-                infer_addr="/tmp/iidx_infer.sock"
+                infer_addr="iidx_infer.sock"
             )
         """
         # 1. 抓取图像
@@ -353,18 +374,25 @@ class OBSManager:
                 )
                 print(f"2P 分数: {results['2pscore']}")
         """
-        # 1. 抓取 1920x1080 图像
-        img = self.capture_source(source_name, target_size, image_format="png")
+        # 1. 抓取 1920x1080 图像（JPEG：OBS 侧 PNG 编码 1080p 需数秒，
+        #    JPEG 快一个数量级；已验证 JPEG 画面识别结果与 PNG 一致）
+        t_capture = time.perf_counter()
+        img = self.capture_source(source_name, target_size, image_format="jpeg")
+        capture_ms = (time.perf_counter() - t_capture) * 1000
+        self.last_score_frame = img
+        img_bytes = self.last_capture_bytes
+        if img_bytes is None:  # 理论不会发生，兜底走本地 JPEG 编码
+            buffer = io.BytesIO()
+            img.convert("RGB").save(buffer, format="JPEG", quality=95)
+            img_bytes = buffer.getvalue()
+        self.last_score_frame_bytes = img_bytes
 
-        # 2. 转换为字节
-        buffer = io.BytesIO()
-        img.save(buffer, format="PNG")
-        img_bytes = buffer.getvalue()
-
-        # 3. 发送到分数识别服务
-        # 协议: [4字节大端长度] [PNG图像数据]
+        # 2. 发送到分数识别服务（直接复用 OBS 返回的 JPEG 字节，
+        #    服务端 cv2.imdecode 原生支持，无需本地重编码）
+        # 协议: [4字节大端长度] [图像数据]
         data = struct.pack(">I", len(img_bytes)) + img_bytes
 
+        t_reco = time.perf_counter()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(infer_addr)
 
@@ -373,9 +401,11 @@ class OBSManager:
             # 接收 JSON 结果
             response = sock.recv(4096).decode().strip()
             results = json.loads(response)
-            return results
         finally:
             sock.close()
+        reco_ms = (time.perf_counter() - t_reco) * 1000
+        print(f"[计时] {source_name} OBS 截图 {capture_ms:.0f}ms，分数识别 {reco_ms:.0f}ms")
+        return results
 
     def capture_score_regions(
         self,
@@ -499,7 +529,8 @@ class OBSManager:
         流程:
         1. 抓取图像并进行状态识别
         2. 将识别结果输入状态机
-        3. 若状态机触发 get_score，则抓取分数
+        3. 状态机触发 get_score 后，连续 SCORE_STREAK_REQUIRED 帧都判定为
+           score 才真正抓图抓分（防转场单帧误判）
         4. 验证分数合法性，不合法且在 score 状态时重试
 
         Args:
@@ -515,6 +546,10 @@ class OBSManager:
                 "状态机未初始化，请先调用 init_state_machine()"
             )
 
+        # Clear stale data when this frame does not enter score recognition.
+        self.last_score_frame = None
+        self.last_score_frame_bytes = None
+
         cfg = self.machines[machine_id]
 
         # 1. 状态识别
@@ -525,15 +560,27 @@ class OBSManager:
         # 2. 状态机处理
         state_result = self._state_manager.process_event(machine_id, label)
 
-        # 3. 分数识别（仅在进入 SCORE 状态时触发，或需要重试时）
-        scores = None
-        need_score_capture = (
-            state_result and "get_score" in state_result.get("actions_triggered", [])
-        ) or (
-            cfg.pending_score_validation and label == "score"
+        # 3. 连续 score 帧计数：状态机触发 get_score 后进入 pending，
+        #    连续 SCORE_STREAK_REQUIRED 帧都是 score 才真正抓图抓分；
+        #    中途出现非 score 帧则取消本次 pending。
+        if label == "score":
+            cfg.score_streak += 1
+        else:
+            cfg.score_streak = 0
+            cfg.pending_score_capture = False
+
+        if state_result and "get_score" in state_result.get("actions_triggered", []):
+            cfg.pending_score_capture = True
+
+        streak_ready = cfg.score_streak >= SCORE_STREAK_REQUIRED
+        need_score_capture = streak_ready and (
+            cfg.pending_score_capture
+            or (cfg.pending_score_validation and label == "score")
         )
 
+        scores = None
         if need_score_capture:
+            cfg.pending_score_capture = False
             scores = self.capture_and_recognize_score(
                 cfg.source_name, cfg.score_infer_addr
             )

@@ -553,6 +553,33 @@ html, body {
     animation: scoreUpdate 0.5s ease-out;
 }
 
+/* ============================================
+   EF 赛制（8 人，从 E/F 组开始）：隐藏 A-D 小组赛区域
+   ============================================ */
+
+.tournament-container.ef-only .player-node.quarterfinal,
+.tournament-container.ef-only .group-a-label,
+.tournament-container.ef-only .group-b-label,
+.tournament-container.ef-only .group-c-label,
+.tournament-container.ef-only .group-d-label {
+    display: none;
+}
+
+/* ============================================
+   直接决赛赛制（4 人）：隐藏 A-F 前置阶段区域
+   ============================================ */
+
+.tournament-container.final-only .player-node.quarterfinal,
+.tournament-container.final-only .player-node.semifinal,
+.tournament-container.final-only .group-a-label,
+.tournament-container.final-only .group-b-label,
+.tournament-container.final-only .group-c-label,
+.tournament-container.final-only .group-d-label,
+.tournament-container.final-only .group-e-label,
+.tournament-container.final-only .group-f-label {
+    display: none;
+}
+
 /* Responsive for OBS */
 @media screen and (max-width: 1920px) {
     html, body {

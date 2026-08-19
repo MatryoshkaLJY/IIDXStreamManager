@@ -8,9 +8,11 @@ Relays messages between testbench and browser clients.
 import asyncio
 import websockets
 import json
+import os
 
 # Store connected clients
 clients = {}
+HOST = os.environ.get("IIDX_RELAY_HOST", "127.0.0.1")
 
 
 async def handler(websocket):
@@ -21,7 +23,7 @@ async def handler(websocket):
         'type': 'unknown'
     }
 
-    print(f"\n🔗 [{client_id}] Client connected (total: {len(clients)})")
+    print(f"\n[connect] [{client_id}] Client connected (total: {len(clients)})")
     print(f"   Remote: {websocket.remote_address}")
 
     try:
@@ -37,7 +39,7 @@ async def handler(websocket):
                     clients[websocket]['type'] = 'testbench'
 
                 client_type = clients[websocket]['type']
-                print(f"\n📨 [{client_id}/{client_type}] Received: {cmd}")
+                print(f"\n[recv] [{client_id}/{client_type}] Received: {cmd}")
 
                 # Broadcast to all other clients
                 broadcast_count = 0
@@ -46,20 +48,20 @@ async def handler(websocket):
                         try:
                             await client.send(message)
                             broadcast_count += 1
-                            print(f"   📤 -> Forwarded to [{info['id']}/{info['type']}]")
+                            print(f"   [send] -> Forwarded to [{info['id']}/{info['type']}]")
                         except websockets.exceptions.ConnectionClosed:
-                            print(f"   ⚠️  Client [{info['id']}] disconnected, removing")
+                            print(f"   [warn] Client [{info['id']}] disconnected, removing")
                             clients.pop(client, None)
 
                 if broadcast_count == 0:
-                    print(f"   ⚠️  No other clients to forward to!")
-                    print(f"   💡 Make sure browser is connected to ws://localhost:8080")
+                    print("   [warn] No other clients to forward to!")
+                    print("   [hint] Make sure browser is connected to ws://127.0.0.1:8080")
 
             except json.JSONDecodeError:
-                print(f"📨 [{client_id}] Raw message: {message}")
+                print(f"[recv] [{client_id}] Raw message: {message}")
 
     except websockets.exceptions.ConnectionClosed as e:
-        print(f"\n🔌 [{client_id}] Connection closed: {e}")
+        print(f"\n[close] [{client_id}] Connection closed: {e}")
     finally:
         del clients[websocket]
         print(f"   Remaining clients: {len(clients)}")
@@ -67,14 +69,14 @@ async def handler(websocket):
 
 async def main():
     print("=" * 50)
-    print("🌐 BPL Scoreboard WebSocket Relay Server")
+    print("[relay] BPL Scoreboard WebSocket Relay Server")
     print("=" * 50)
     print("\nWaiting for connections...")
     print("  - Browser: open index.html")
     print("  - Testbench: python testbench.py")
     print("\nPress Ctrl+C to stop\n")
 
-    async with websockets.serve(handler, "localhost", 8080):
+    async with websockets.serve(handler, HOST, 8080):
         await asyncio.Future()  # Run forever
 
 
@@ -82,4 +84,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("\n\n👋 Server stopped")
+        print("\n\n[stop] Server stopped")

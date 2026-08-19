@@ -1,0 +1,248 @@
+{
+  "playType": "SP",
+  "stageName": "セミファイナルステージ",
+  "matchNumber": 1,
+  "leftTeam": {
+    "name": "大8大 S2",
+    "emoji": "🎩",
+    "colors": {
+      "primary": "#c0c0c0",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "NEMESIS",
+      "EVIS.",
+      "GAUDAN",
+      "JACKPO",
+      "7sRef",
+      "6 / XG.Ame",
+      "XG.Ame",
+      "CLOUD",
+      "-HP",
+      "ShaMa0",
+      "ANSHI",
+      "P3"
+    ]
+  },
+  "rightTeam": {
+    "name": "葬爱",
+    "emoji": "🚀",
+    "colors": {
+      "primary": "#1a3a6b",
+      "secondary": "#ffffff"
+    },
+    "players": [
+      "TOURH",
+      "RIO",
+      "JOLAO",
+      "ShanMu",
+      "Taffy",
+      "W",
+      "ERU",
+      "CN.Lyy",
+      "Ern1st",
+      "LION",
+      "29.0",
+      "S9ryne"
+    ]
+  },
+  "grabRounds": 4,
+  "rounds": [
+    {
+      "type": "1v1",
+      "theme": "RANDOM LEVEL 8",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["NEMESIS"],
+          "rightPlayers": ["TOURH"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "RANDOM LEVEL 9",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["EVIS."],
+          "rightPlayers": ["RIO"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "RANDOM LEVEL 10",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["GAUDAN"],
+          "rightPlayers": ["JOLAO"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "RANDOM LEVEL 11",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["JACKPO"],
+          "rightPlayers": ["ShanMu"]
+        }
+      ],
+      "points": 1,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "NOTES LEVEL 8-9",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["7sRef"],
+          "rightPlayers": ["Taffy"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["7sRef"],
+          "rightPlayers": ["Taffy"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHARGE LEVEL 9-10",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["6 / XG.Ame"],
+          "rightPlayers": ["W"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["6 / XG.Ame"],
+          "rightPlayers": ["W"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SOF-LAN LEVEL 10-11",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["XG.Ame"],
+          "rightPlayers": ["ERU"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["XG.Ame"],
+          "rightPlayers": ["ERU"]
+        }
+      ],
+      "points": 2,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "SCRATCH LEVEL 11",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["CLOUD"],
+          "rightPlayers": ["CN.Lyy"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["CLOUD"],
+          "rightPlayers": ["CN.Lyy"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "CHORD LEVEL 11",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["-HP"],
+          "rightPlayers": ["Ern1st"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["-HP"],
+          "rightPlayers": ["Ern1st"]
+        }
+      ],
+      "points": 3,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "PEAK LEVEL 11-12",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["ShaMa0"],
+          "rightPlayers": ["LION"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["ShaMa0"],
+          "rightPlayers": ["LION"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE LEVEL 12",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["ANSHI"],
+          "rightPlayers": ["29.0"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["ANSHI"],
+          "rightPlayers": ["29.0"]
+        }
+      ],
+      "points": 4,
+      "judgeBy": "ex"
+    },
+    {
+      "type": "1v1",
+      "theme": "FREE LEVEL 12",
+      "games": [
+        {
+          "theme": "",
+          "leftPlayers": ["P3"],
+          "rightPlayers": ["S9ryne"]
+        },
+        {
+          "theme": "",
+          "leftPlayers": ["P3"],
+          "rightPlayers": ["S9ryne"]
+        }
+      ],
+      "points": 5,
+      "judgeBy": "ex"
+    }
+  ]
+}
