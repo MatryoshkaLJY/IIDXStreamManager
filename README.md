@@ -1,244 +1,150 @@
 # IIDX Stream Manager
 
-<p align="center">
-  <strong>beatmania IIDX 直播辅助工具集</strong> | <strong>beatmania IIDX Stream Assistant Toolset</strong> | <strong>beatmania IIDX 配信支援ツールセット</strong>
-</p>
+beatmania IIDX 赛事直播工具集。当前生产入口是 **iidx_director**：导播通过网页导入赛程、分配机台、确认回合、抓取成绩、复核比分，并将确认后的结果推送到 OBS overlay 和记分板。
 
----
+旧的 iidx_tpl_manager 仅作为历史模块保留；streamlit-app 和 iidx_stream_state_machine 已移除。
 
-## 🌐 Language / 语言 / 言語
+## 生产导播台
 
-- [English](#english)
-- [简体中文](#简体中文)
-- [日本語](#日本語)
+iidx_director 是 Flask + Flask-SocketIO 应用，默认运行在 http://127.0.0.1:5003/。它负责：
 
----
+- 团队赛（BPL）和个人淘汰赛的赛程加载、Pydantic 校验与模板生成；
+- 团队赛 1v1 / 2v2、抢夺赛、EX/BP 判定和决赛三局配置；
+- 16 人淘汰赛 A-D → E/F → 决赛；
+- 8 人 EF 赛制和 4 人直接决赛；
+- 每个回合的选手到机台、1P/2P 侧分配；
+- 多机台成绩截图、分数识别、手动补录、重抓和推送重试；
+- OBS 场景切换、源可见性、overlay 文字/Hue 覆盖；
+- 可选的团队赛 1v1 串口音频切换。
 
-<a name="english"></a>
-## English
+### 回合状态
 
-### Overview
+    IDLE -> PREP -> LIVE -> REVIEW -> PUSHED
+                             |          |
+                             +----------+-> 下一回合 PREP / MATCH_END
 
-IIDX Stream Assistant is a comprehensive toolset designed for beatmania IIDX arcade game streaming. It provides automated scene recognition, score tracking, state management, and professional broadcasting overlays.
+导播在 PREP 分配机台并确认开始；LIVE 阶段由导播手动点击“抓取所有机台分数”，不再依赖已弃用的状态识别模型自动判断游玩状态；REVIEW 阶段可修正识别结果，只有确认后才写入记分板。
 
-### Features
+## 快速启动
 
-| Module | Description |
-|--------|-------------|
-| **iidx_state_reco** | Deep learning-based game screen state recognition (entry, play, score, etc.) |
-| **iidx_score_reco** | Real-time score recognition from game result screens via TCP service |
-| **iidx_state_machine** | Game state machine tracking arena/battle/standard/dan modes |
-| **obs_manager** | OBS Studio integration for automated capture and recognition |
-| **iidx_bpl_scoreboard** | Professional BPL-style scoreboard with WebSocket control |
-| **tpl_scene_switcher** | TPL tournament scene switcher with Streamlit interface |
+### Linux / macOS
 
-### Quick Start
+在仓库根目录创建环境并安装依赖：
 
-```bash
-# 1. State Recognition Service
-python iidx_state_reco/serve.py --checkpoint model.pt --port 9876
+    python3 -m venv .venv
+    .venv/bin/python -m pip install Flask Flask-SocketIO pydantic obsws-python websockets Pillow numpy PyYAML opencv-python onnxruntime pytest
 
-# 2. Score Recognition Service
-python iidx_score_reco/serve.py --font font/ --port 9877 --rois-csv rois.csv
+启动 OBS Studio（WebSocket 5，默认端口 4455），然后启动导播台：
 
-# 3. OBS Manager (Multi-machine tracking)
-python obs_manager/obs_manager.py --host localhost --port 4455 --password your_password
-```
+    cd iidx_director
+    ../.venv/bin/python -m src.app
 
-### System Architecture
+导播台会自动启动未占用的本地成绩识别服务、两个记分板 relay 和 overlay relay。已有监听端口会被复用，不会被导播台接管或退出。调试时可禁用自动启动：
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  OBS Studio │────▶│ OBS Manager │────▶│  State Reco │
-│  (Source)   │     │ (WebSocket) │     │   (TCP)     │
-└─────────────┘     └──────┬──────┘     └─────────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌─────────┐  ┌──────────┐  ┌───────────┐
-        │State    │  │  Score   │  │   BPL     │
-        │Machine  │  │  Reco    │  │ Scoreboard│
-        └─────────┘  └──────────┘  └───────────┘
-```
+    ../.venv/bin/python -m src.app --no-autostart
 
-### TODO
+OBS 密码使用环境变量 IIDX_OBS_PASSWORD 或在设置页输入；密码不会写入运行时状态。
 
-- [ ] **Copyright Content Detection & Masking**: Implement automatic detection and masking of copyrighted content (such as licensed songs, logos) to prevent stream takedowns or demonetization.
+### Windows 生产包
 
----
+生产目录为 iidx_director_windows/，部署说明见 DEPLOY_WINDOWS.md：
 
-<a name="简体中文"></a>
-## 简体中文
+    Set-ExecutionPolicy -Scope Process Bypass
+    .\\install_windows.ps1
+    .\\check_windows_install.ps1
+    .\\start_director.bat
 
-### 项目简介
+无机台采集卡时使用 start_director_test_mode.bat。停止由本次启动创建的服务：
 
-IIDX Stream Assistant 是一个专为 beatmania IIDX 街机游戏直播设计的综合工具集。它提供自动场景识别、分数追踪、状态管理和专业直播画面叠加功能。
+    .\\stop_services.ps1
 
-### 功能模块
+## 导播操作流程
 
-| 模块 | 说明 |
-|------|------|
-| **iidx_state_reco** | 基于深度学习的游戏画面状态识别（入场、游玩、分数等） |
-| **iidx_score_reco** | TCP服务方式实时识别游戏结算画面分数 |
-| **iidx_state_machine** | 游戏状态机，追踪竞技场/对战/标准/段位模式 |
-| **obs_manager** | OBS Studio 集成，实现自动捕获和识别 |
-| **iidx_bpl_scoreboard** | 专业BPL风格记分板，支持WebSocket控制 |
-| **tpl_scene_switcher** | TPL比赛场景切换器，提供Streamlit界面 |
+1. 在设置页连接 OBS，选择 team、knockout、knockout_ef 或 knockout_final。
+2. 上传或编辑赛程 JSON，点击开始比赛；应用会向对应记分板发送 init。
+3. 在回合准备页为每位选手选择机台和 1P / 2P 侧，确认开始并应用场景事务。
+4. 比赛结束后点击抓分；成绩服务读取截图中的 EX 分，BP 回合读取 miss count。
+5. 在比分确认页检查截图和结果，可手动修改缺失或错误分数。
+6. 确认推送后写入记分板并进入下一回合；推送失败可重试。
 
-### 快速开始
+开发测试模式会跳过机台监控，可通过接口注入成绩：
 
-```bash
-# 1. 启动状态识别服务
-python iidx_state_reco/serve.py --checkpoint model.pt --port 9876
+    POST /api/test/scores
+    {"machine_id":"IIDX#1","scores":{"1p":2000,"2p":1500}}
 
-# 2. 启动分数识别服务
-python iidx_score_reco/serve.py --font font/ --port 9877 --rois-csv rois.csv
+## OBS 与服务端口
 
-# 3. 启动OBS管理器（多机器追踪）
-python obs_manager/obs_manager.py --host localhost --port 4455 --password your_password
-```
+| 端口 | 服务 | 说明 |
+| ---: | --- | --- |
+| 4455 | OBS Studio WebSocket | 外部依赖 |
+| 5003 | iidx_director | 导播网页、API、Socket.IO |
+| 8080 | BPL scoreboard relay | 团队赛记分板 |
+| 8081 | knockout scoreboard relay | 淘汰赛记分板 |
+| 8082 | overlay relay | OBS overlay 消息 |
+| 9877 | iidx_score_reco | 成绩/BP TCP 识别服务 |
+| 9876 | iidx_state_reco | 已弃用，不自动启动，保留备用 |
 
-### 系统架构
+浏览器源统一从导播台提供：
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  OBS Studio │────▶│   OBS管理器  │────▶│   状态识别   │
-│   (视频源)   │     │ (WebSocket) │     │   (TCP)     │
-└─────────────┘     └──────┬──────┘     └─────────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌─────────┐  ┌──────────┐  ┌───────────┐
-        │ 状态机   │  │  分数识别  │  │  BPL记分板 │
-        └─────────┘  └──────────┘  └───────────┘
-```
+    http://127.0.0.1:5003/overlay/
+    http://127.0.0.1:5003/scoreboard/bpl/
+    http://127.0.0.1:5003/scoreboard/knockout/
 
-### TODO
+所有浏览器源按 1920x1080 配置；overlay 使用透明背景。
 
-- [ ] **添加版权内容识别与遮挡的功能，防止直播因版权内容被切断或剥夺收益化**
+## 赛程配置
 
----
+配置文件位于 iidx_director/data/，上传时会校验，旧文件备份为 .bak：
 
-<a name="日本語"></a>
-## 日本語
+| 文件 | 模式 | 结构 |
+| --- | --- | --- |
+| team_match.json | team | 双队、回合、选手、主题、分值 |
+| knockout.json | knockout | A-D 四组 16 人 |
+| knockout_ef.json | knockout_ef | E/F 两组 8 人 |
+| knockout_final.json | knockout_final | finals 组 4 人 |
 
-### プロジェクト概要
+团队赛顶层可设置 playType 为 SP 或 DP。团队回合支持 1v1、2v2、judgeBy: ex 或 1v1 专用的 judgeBy: bp。前 grabRounds 回合为抢夺赛，不写入记分板；结束后导播录入奖励 PT。
 
-IIDX Stream Assistant は、beatmania IIDX アーケードゲームの配信向けに設計された包括的なツールセットです。自動画面認識、スコア追跡、状態管理、およびプロフェッショナルな配信オーバーレイ機能を提供します。
+淘汰赛每局按竞争排名计算 PT 2/1/0/0。A-D 组第 2/3 名跨线且 PT、总 EX 均相同时加赛；决赛任意 PT 并列都加赛。Python 逻辑与 iidx_knockout_scoreboard/app.js 保持一致。
 
-### 機能モジュール
+## Overlay 与协议
 
-| モジュール | 説明 |
-|-----------|------|
-| **iidx_state_reco** | ディープラーニングベースのゲーム画面状態認識（エントリー、プレイ、スコアなど） |
-| **iidx_score_reco** | TCPサービスによるゲーム結果画面のリアルタイムスコア認識 |
-| **iidx_state_machine** | ゲーム状態マシン、アリーナ/バトル/スタンダード/段位モードを追跡 |
-| **obs_manager** | OBS Studio との統合、自動キャプチャーと認識を実現 |
-| **iidx_bpl_scoreboard** | プロフェッショナルなBPLスタイルのスコアボード、WebSocket制御対応 |
-| **tpl_scene_switcher** | TPL大会用シーン切り替え器、Streamlitインターフェース付き |
+Overlay 页面和资源在 iidx_director/overlay/，模板包括 sp-bpl、dp-bpl、sp-arena、dp-arena。overlay relay（ws://127.0.0.1:8082）接收 round_start、round_result、match_end、set_text 和 set_hue。
 
-### クイックスタート
+记分板通过 JSON WebSocket 接收 init、score、settle、reset。协议细节见 iidx_bpl_scoreboard/PROTOCOL.md 和 iidx_director/README.md。
 
-```bash
-# 1. 状態認識サービスの起動
-python iidx_state_reco/serve.py --checkpoint model.pt --port 9876
+## 目录结构
 
-# 2. スコア認識サービスの起動
-python iidx_score_reco/serve.py --font font/ --port 9877 --rois-csv rois.csv
+    iidx_director/             生产导播台、赛程、overlay、测试
+    iidx_bpl_scoreboard/       BPL 团队赛浏览器源与 relay
+    iidx_knockout_scoreboard/  个人淘汰赛浏览器源与 relay
+    iidx_score_reco/           OpenCV 成绩/BP 识别服务
+    iidx_state_reco/           已弃用的 ONNX 状态识别服务
+    iidx_state_machine/        状态机实现，供 obs_manager 进程内使用
+    obs_manager/               OBS 截图与识别封装
+    iidx_tpl_manager/          旧版导播台，暂不维护
+    iidx_tpl_design_rules/     overlay 设计规格
 
-# 3. OBSマネージャーの起動（マルチ筐体追跡）
-python obs_manager/obs_manager.py --host localhost --port 4455 --password your_password
-```
+模块通过 TCP、WebSocket 和文件配置协作。除 obs_manager 加载状态机、iidx_director 使用 obs_manager 外，不依赖跨目录 Python 导入。
 
-### システムアーキテクチャ
+## 测试
 
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  OBS Studio │────▶│ OBSマネージャー│────▶│  状態認識   │
-│  (ソース)    │     │ (WebSocket) │     │   (TCP)     │
-└─────────────┘     └──────┬──────┘     └─────────────┘
-                           │
-              ┌────────────┼────────────┐
-              ▼            ▼            ▼
-        ┌─────────┐  ┌──────────┐  ┌───────────┐
-        │状態マシン│  │  スコア認識 │  │  BPLスコアボード│
-        └─────────┘  └──────────┘  └───────────┘
-```
+    cd iidx_director
+    pytest
+    cd ..
+    python test_knockout_integration.py
+    cd iidx_knockout_scoreboard
+    node app.test.js
 
-### TODO
+iidx_director 测试默认 mock OBS、WebSocket 和外部服务；集成脚本覆盖 16 人、EF 和 4 人决赛状态流转。
 
-- [ ] **著作権コンテンツの検出とマスキング機能を追加し、配信が著作権コンテンツによって切断されたり収益化が剥奪されたりするのを防ぐ**
+## 相关文档
 
----
+- iidx_director/README.md：导播台 API、overlay 和配置细节
+- DEPLOY_WINDOWS.md：Windows 安装、启动、OBS 源和故障排查
+- iidx_bpl_scoreboard/PROTOCOL.md：BPL 记分板协议
+- AGENTS.md：仓库结构、端口和维护约定
 
-## 📁 Project Structure / 项目结构 / プロジェクト構成
+## 许可证
 
-```
-.
-├── iidx_state_reco/          # Game state recognition (CNN classifier)
-│   ├── train.py              # Training script
-│   ├── serve.py              # TCP inference server
-│   ├── infer.py              # Inference utilities
-│   └── export_onnx.py        # ONNX export
-│
-├── iidx_score_reco/          # Score recognition (template matching)
-│   ├── recognizer.py         # Core recognition class
-│   ├── serve.py              # TCP service
-│   └── rois.csv              # ROI configuration
-│
-├── iidx_state_machine/       # Game state machine
-│   ├── state_machine.py      # State machine implementation
-│   └── state_machine.yaml    # State definitions
-│
-├── obs_manager/              # OBS Studio integration
-│   ├── obs_manager.py        # Main OBS manager
-│   └── web_monitor.py        # Web-based monitor
-│
-├── iidx_bpl_scoreboard/      # BPL-style scoreboard
-│   ├── index.html            # Scoreboard display
-│   ├── app.js                # Frontend logic
-│   └── testbench/            # Python WebSocket server
-│
-└── tpl_scene_switcher/       # TPL tournament switcher
-    ├── streamlit_app.py      # Streamlit interface
-    └── switcher.py           # Scene switching logic
-```
-
-## 🔧 Dependencies / 依赖 / 依存関係
-
-### Core / 核心 / コア
-- Python 3.8+
-- PyTorch (for state recognition)
-- OpenCV
-- NumPy
-- Pillow
-
-### OBS Integration / OBS集成 / OBS連携
-- obsws-python
-
-### BPL Scoreboard / BPL记分板 / BPLスコアボード
-- websockets (Python) or ws (Node.js)
-
-### TPL Switcher / TPL切换器 / TPLスイッチャー
-- streamlit
-- pyserial
-
-## 🤝 Contributing / 贡献 / コントリビューション
-
-Contributions are welcome! Please feel free to submit issues or pull requests.
-
-欢迎贡献！请随时提交 Issue 或 Pull Request。
-
-コントリビューションを歓迎します！Issue や Pull Request を自由に送信してください。
-
-## 📄 License / 许可证 / ライセンス
-
-MIT License
-
----
-
-<p align="center">
-  Made with ❤️ for the beatmania IIDX community<br/>
-  为 beatmania IIDX 社区精心制作<br/>
-  beatmania IIDX コミュニティのために作りました
-</p>
+MIT
