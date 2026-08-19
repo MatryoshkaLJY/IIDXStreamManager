@@ -77,7 +77,7 @@ IIDX 赛事生产导播台。网页端由 Flask + Flask-SocketIO 提供，默认
 
 设置页保存 enabled、port、baudrate（默认 9600）和 timeout。发送失败会在页面显示 notice，并自动重试一次。设备固件和硬件实现见：
 
-    git@github.com:MatryoshkaLJY/Pico-quad-audio-switch.git
+    https://github.com/MatryoshkaLJY/Pico-quad-audio-switch
 
 ## API 要点
 
